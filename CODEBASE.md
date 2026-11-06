@@ -170,7 +170,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn fetch_space (& mut self)
   ```
 
-### `src/tui/modals.rs` (Role: tui, Lines: 163)
+### `src/tui/modals.rs` (Role: tui, Lines: 157)
 - **Responsibility**: Core tui logic in src/tui/modals.rs
 - **Imports**: use crate :: tui :: app :: { AddField , App } , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Clear , Paragraph } , Frame , } 
 - **Public Functions & Signatures**:
@@ -197,9 +197,9 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_feed (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui.rs` (Role: tui, Lines: 222)
+### `src/tui.rs` (Role: tui, Lines: 231)
 - **Responsibility**: Core tui logic in src/tui.rs
-- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: Terminal , use std :: io :: { stdout , Stdout } , use std :: time :: Duration 
+- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: Duration 
 - **Public Functions & Signatures**:
   ```rust
   async fn run (config : Config , db : Db) -> Result < () >

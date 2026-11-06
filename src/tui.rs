@@ -8,7 +8,7 @@ pub mod views;
 
 use crate::config::Config;
 use crate::db::Db;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use app::{AddField, App, InputMode, Tab};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -16,8 +16,8 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
-use std::io::{stdout, Stdout};
+use ratatui::{Terminal, TerminalOptions, Viewport};
+use std::io::{stdout, IsTerminal, Stdout};
 use std::time::Duration;
 
 /// RAII guard to ensure the terminal is restored even during panics or early returns.
@@ -32,6 +32,10 @@ impl Drop for TerminalGuard {
 
 /// Runs the interactive TUI until the user quits.
 pub async fn run(config: Config, db: Db) -> Result<()> {
+    if !stdout().is_terminal() {
+        bail!("interactive TUI requires a TTY terminal");
+    }
+
     enable_raw_mode().context("failed to enable terminal raw mode")?;
     let mut out = stdout();
     execute!(out, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -45,8 +49,13 @@ pub async fn run(config: Config, db: Db) -> Result<()> {
     }));
 
     let backend = CrosstermBackend::new(out);
-    let mut terminal = Terminal::new(backend).context("failed to create ratatui terminal")?;
-    terminal.clear().context("failed to clear terminal")?;
+    let mut terminal = Terminal::with_options(
+        backend,
+        TerminalOptions {
+            viewport: Viewport::Fullscreen,
+        },
+    )
+    .context("failed to create ratatui terminal")?;
 
     let mut app = App::new(config, db);
     app.fetch_space().await;
