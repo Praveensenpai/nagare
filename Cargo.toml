@@ -1,0 +1,27 @@
+[package]
+name = "nagare"
+version = "0.1.0"
+edition = "2021"
+description = "Weekly anime RSS scheduler that delivers through Seedr and purges the cloud"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+crossterm = "0.29.0"
+dirs = "5"
+ratatui = "0.30.2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+roxmltree = "0.20"
+rusqlite = { version = "0.32", features = ["bundled"] }
+seedr-dl = { git = "https://github.com/Praveensenpai/seedr-dl.git", tag = "v0.0.14" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "time"] }
+toml = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
