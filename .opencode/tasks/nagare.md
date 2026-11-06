@@ -1,7 +1,7 @@
 # Task: Ship nagare with Interactive TUI (anime RSS → Seedr → Jellyfin)
 
-> **Status:** In progress
-> **Updated:** 2026-11-06
+> **Status:** Complete
+> **Updated:** 2026-11-07
 
 ## Plan
 
@@ -12,8 +12,8 @@
 - [x] **5. nagare interactive TUI** — Ratatui 0.30 + Crossterm 0.29 aesthetic terminal dashboard
 - [x] **6. nagare test fix & verification** — fixed `parse_size` test, clippy 0 warnings, 19 unit & headless TUI tests passing, karakuri audit 0 violations
 - [x] **7. nagare deploy & docs** — README.md, LICENSE, systemd user timer spec, CODEBASE.md
-- [ ] **8. seedr-dl release** — tag `v0.0.14`, push, CI verification
-- [ ] **9. nagare release** — initialize git, create GitHub repo, tag `v0.1.0`, CI verification
+- [x] **8. seedr-dl release** — tag `v0.0.14`, push, CI green with Linux musl & macOS aarch64 assets
+- [x] **9. nagare release** — public GitHub repo `Praveensenpai/nagare`, tag `v0.1.0`, CI green with Linux x86_64 asset
 
 ## Details
 
@@ -26,7 +26,3 @@
 - [x] TUI: interactive keyboard actions (tab switch, add show modal, delete, scan now, filter)
 - [x] Headless TUI rendering integration test passing
 - [x] Codebase audited with zero function length, nesting, or documentation violations
-
-## Blocked
-
-- None
