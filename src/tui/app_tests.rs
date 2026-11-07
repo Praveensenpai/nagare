@@ -19,11 +19,13 @@ fn test_app() -> App {
 #[test]
 fn tab_navigation_cycles() {
     assert_eq!(Tab::Tracked.next(), Tab::Feed);
-    assert_eq!(Tab::Feed.next(), Tab::Activity);
+    assert_eq!(Tab::Feed.next(), Tab::Downloads);
+    assert_eq!(Tab::Downloads.next(), Tab::Activity);
     assert_eq!(Tab::Activity.next(), Tab::Tracked);
 
     assert_eq!(Tab::Tracked.prev(), Tab::Activity);
-    assert_eq!(Tab::Activity.prev(), Tab::Feed);
+    assert_eq!(Tab::Activity.prev(), Tab::Downloads);
+    assert_eq!(Tab::Downloads.prev(), Tab::Feed);
     assert_eq!(Tab::Feed.prev(), Tab::Tracked);
 }
 

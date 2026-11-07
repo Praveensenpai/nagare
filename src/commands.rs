@@ -1,5 +1,8 @@
 //! CLI command implementations.
 
+mod downloads;
+pub use downloads::downloads;
+
 use crate::config::Config;
 use crate::db::Db;
 use crate::feed::{self, Item};

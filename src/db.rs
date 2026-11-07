@@ -65,6 +65,19 @@ pub struct Event {
     pub message: String,
 }
 
+/// A release record that was grabbed and saved to disk.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GrabbedRelease {
+    pub infohash: String,
+    pub show_id: i64,
+    pub show_title: String,
+    pub season: u32,
+    pub episode: f64,
+    pub title: String,
+    pub bytes: u64,
+    pub grabbed_at: String,
+}
+
 /// Open handle to the state database.
 pub struct Db {
     conn: Connection,
@@ -196,6 +209,33 @@ impl Db {
         Ok(())
     }
 
+    /// Lists grabbed releases joined with show metadata, newest first.
+    ///
+    /// # Errors
+    /// Returns an error if the query fails.
+    pub fn releases(&self, limit: usize) -> Result<Vec<GrabbedRelease>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.infohash, r.show_id, s.title, r.season, r.episode, r.title, r.bytes, r.grabbed_at
+             FROM releases r
+             JOIN shows s ON s.id = r.show_id
+             ORDER BY r.grabbed_at DESC, r.rowid DESC
+             LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit as i64], |r| {
+            Ok(GrabbedRelease {
+                infohash: r.get(0)?,
+                show_id: r.get(1)?,
+                show_title: r.get(2)?,
+                season: r.get(3)?,
+                episode: r.get(4)?,
+                title: r.get(5)?,
+                bytes: r.get::<_, i64>(6)? as u64,
+                grabbed_at: r.get(7)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Reads a free-form state value.
     ///
     /// # Errors
@@ -299,5 +339,17 @@ mod tests {
         let db = mem();
         db.set_state("etag", "abc").expect("set");
         assert_eq!(db.get_state("etag").expect("get").as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn list_releases_newest_first() {
+        let mut db = mem();
+        let id = db.add_show("Show", "show", 1, 0.0).expect("add");
+        db.record_release("H1", id, 1, 1.0, "Show - 01", 100).expect("rec1");
+        db.record_release("H2", id, 1, 2.0, "Show - 02", 200).expect("rec2");
+        let rels = db.releases(10).expect("rels");
+        assert_eq!(rels.len(), 2);
+        assert_eq!(rels[0].episode, 2.0);
+        assert_eq!(rels[0].show_title, "Show");
     }
 }

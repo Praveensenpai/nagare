@@ -108,7 +108,9 @@ pub async fn refresh_jellyfin(config: &Jellyfin) -> Result<()> {
     Ok(())
 }
 
-fn sanitize(value: &str) -> String {
+/// Sanitizes a string for filesystem path usage.
+#[must_use]
+pub fn sanitize(value: &str) -> String {
     let cleaned: String = value
         .chars()
         .map(|ch| {
@@ -125,6 +127,27 @@ fn sanitize(value: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+/// Computes the expected final library path for an episode.
+#[must_use]
+pub fn expected_path(library: &Path, show: &str, season: u32, episode: f64) -> PathBuf {
+    let clean = sanitize(show);
+    library
+        .join(&clean)
+        .join(format!("Season {:02}", season))
+        .join(format!("{clean} - S{:02}E{:02}.mkv", season, episode as u32))
+}
+
+/// Checks if an episode's video file exists on disk in the library.
+#[must_use]
+pub fn exists_on_disk(library: &Path, show: &str, season: u32, episode: f64) -> bool {
+    let clean = sanitize(show);
+    let dir = library.join(&clean).join(format!("Season {:02}", season));
+    let stem = format!("{clean} - S{:02}E{:02}", season, episode as u32);
+    VIDEO_EXTENSIONS
+        .iter()
+        .any(|ext| dir.join(format!("{stem}.{ext}")).exists())
 }
 
 #[cfg(test)]

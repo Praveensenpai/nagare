@@ -2,6 +2,7 @@
 
 pub mod activity;
 pub mod app;
+pub mod downloads;
 pub mod modals;
 pub mod transfer;
 pub mod ui;
@@ -75,6 +76,7 @@ async fn event_loop(
         app.active_transfer = tracker.poll();
         if prev_active && app.active_transfer.is_none() {
             app.reload_shows();
+            app.reload_releases();
             app.reload_events();
         }
         terminal.draw(|f| ui::draw(f, app))?;
@@ -212,7 +214,8 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::BackTab => app.active_tab = app.active_tab.prev(),
         KeyCode::Char('1') => app.active_tab = Tab::Tracked,
         KeyCode::Char('2') => app.active_tab = Tab::Feed,
-        KeyCode::Char('3') => app.active_tab = Tab::Activity,
+        KeyCode::Char('3') => app.active_tab = Tab::Downloads,
+        KeyCode::Char('4') => app.active_tab = Tab::Activity,
         KeyCode::Char('j') | KeyCode::Down => move_selection(app, 1),
         KeyCode::Char('k') | KeyCode::Up => move_selection(app, -1),
         KeyCode::Char('g') | KeyCode::Home => jump_selection(app, false),
@@ -260,6 +263,13 @@ fn move_selection(app: &mut App, delta: isize) {
                 app.selected_feed = next;
             }
         }
+        Tab::Downloads => {
+            if !app.releases.is_empty() {
+                let next = (app.selected_release as isize + delta)
+                    .clamp(0, app.releases.len() as isize - 1) as usize;
+                app.selected_release = next;
+            }
+        }
         Tab::Activity => {}
     }
 }
@@ -275,6 +285,15 @@ fn jump_selection(app: &mut App, to_end: bool) {
             if !app.filtered_feed.is_empty() {
                 app.selected_feed = if to_end {
                     app.filtered_feed.len() - 1
+                } else {
+                    0
+                };
+            }
+        }
+        Tab::Downloads => {
+            if !app.releases.is_empty() {
+                app.selected_release = if to_end {
+                    app.releases.len() - 1
                 } else {
                     0
                 };

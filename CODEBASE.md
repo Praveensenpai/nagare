@@ -15,9 +15,17 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
 
 ## 3. Module & Interface Skeleton
 
-### `src/commands.rs` (Role: general, Lines: 359)
+### `src/commands/downloads.rs` (Role: general, Lines: 116)
+- **Responsibility**: Core general logic in src/commands/downloads.rs
+- **Imports**: use crate :: config :: Config , use crate :: db :: { Db , GrabbedRelease } , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: transfer :: TransferTracker , use anyhow :: Result 
+- **Public Functions & Signatures**:
+  ```rust
+  fn downloads (cfg : & Config , db : & Db , json : bool) -> Result < () >
+  ```
+
+### `src/commands.rs` (Role: general, Lines: 362)
 - **Responsibility**: Core general logic in src/commands.rs
-- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline , use anyhow :: { bail , Context , Result } , use std :: collections :: BTreeMap , use std :: io :: Write 
+- **Imports**: pub use downloads :: downloads , use crate :: config :: Config , use crate :: db :: Db , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline , use anyhow :: { bail , Context , Result } , use std :: collections :: BTreeMap , use std :: io :: Write 
 - **Public Functions & Signatures**:
   ```rust
   async fn run (cfg : & Config , db : & mut Db , dry_run : bool , json : bool) -> Result < () >
@@ -44,13 +52,14 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn load () -> Result < Config >
   ```
 
-### `src/db.rs` (Role: general, Lines: 303)
+### `src/db.rs` (Role: general, Lines: 355)
 - **Responsibility**: Core general logic in src/db.rs
 - **Imports**: use crate :: config , use anyhow :: { Context , Result } , use rusqlite :: { params , Connection , OptionalExtension } , use std :: path :: Path 
 - **Types & Enums**:
   ```rust
   pub struct Show
   pub struct Event
+  pub struct GrabbedRelease
   pub struct Db
   ```
 - **Public Functions & Signatures**:
@@ -62,6 +71,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn remove_show (& self , id : i64) -> Result < bool >
   fn has_release (& self , infohash : & str) -> Result < bool >
   fn record_release (& mut self , infohash : & str , show_id : i64 , season : u32 , episode : f64 , title : & str , bytes : u64 ,) -> Result < () >
+  fn releases (& self , limit : usize) -> Result < Vec < GrabbedRelease > >
   fn get_state (& self , key : & str) -> Result < Option < String > >
   fn set_state (& self , key : & str , value : & str) -> Result < () >
   fn log_event (& self , level : & str , message : & str) -> Result < () >
@@ -83,7 +93,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn parse (body : & str) -> Result < Vec < Item > >
   ```
 
-### `src/main.rs` (Role: general, Lines: 75)
+### `src/main.rs` (Role: general, Lines: 78)
 - **Responsibility**: Core general logic in src/main.rs
 - **Imports**: use anyhow :: { Context , Result } , use clap :: { Parser , Subcommand } 
 
@@ -106,7 +116,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn alert (title : & str , body : & str)
   ```
 
-### `src/organize.rs` (Role: general, Lines: 158)
+### `src/organize.rs` (Role: general, Lines: 181)
 - **Responsibility**: Core general logic in src/organize.rs
 - **Imports**: use crate :: config :: Jellyfin , use crate :: feed :: Item , use anyhow :: { Context , Result } , use std :: path :: { Path , PathBuf } 
 - **Types & Enums**:
@@ -118,6 +128,9 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn plan (item : & Item) -> Placement
   async fn place (library : & Path , staging : & Path , placement : & Placement , files : & [PathBuf] ,) -> Result < PathBuf >
   async fn refresh_jellyfin (config : & Jellyfin) -> Result < () >
+  fn sanitize (value : & str) -> String
+  fn expected_path (library : & Path , show : & str , season : u32 , episode : f64) -> PathBuf
+  fn exists_on_disk (library : & Path , show : & str , season : u32 , episode : f64) -> bool
   ```
 
 ### `src/pipeline.rs` (Role: general, Lines: 307)
@@ -144,7 +157,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui/app.rs` (Role: tui, Lines: 366)
+### `src/tui/app.rs` (Role: tui, Lines: 385)
 - **Responsibility**: Core tui logic in src/tui/app.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: { Db , Event , Show } , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline :: TransferProgress , use anyhow :: Result , use std :: time :: Instant 
 - **Types & Enums**:
@@ -162,6 +175,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn next (self) -> Self
   fn new (config : Config , db : Db) -> Self
   fn reload_shows (& mut self)
+  fn reload_releases (& mut self)
   fn reload_events (& mut self)
   fn set_status (& mut self , text : impl Into < String >)
   fn active_status (& self) -> Option < & str >
@@ -175,9 +189,17 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn fetch_space (& mut self)
   ```
 
-### `src/tui/app_tests.rs` (Role: tui, Lines: 133)
+### `src/tui/app_tests.rs` (Role: tui, Lines: 135)
 - **Responsibility**: Core tui logic in src/tui/app_tests.rs
 - **Imports**: use super :: * , use std :: path :: { Path , PathBuf } 
+
+### `src/tui/downloads.rs` (Role: tui, Lines: 181)
+- **Responsibility**: Core tui logic in src/tui/downloads.rs
+- **Imports**: use crate :: db :: GrabbedRelease , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: app :: App , use ratatui :: { layout :: { Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Gauge , Paragraph , Row , Table } , Frame , } 
+- **Public Functions & Signatures**:
+  ```rust
+  fn render (frame : & mut Frame , area : Rect , app : & App)
+  ```
 
 ### `src/tui/modals.rs` (Role: tui, Lines: 239)
 - **Responsibility**: Core tui logic in src/tui/modals.rs
@@ -204,9 +226,9 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn trigger_background_download () -> std :: io :: Result < () >
   ```
 
-### `src/tui/ui.rs` (Role: tui, Lines: 353)
+### `src/tui/ui.rs` (Role: tui, Lines: 375)
 - **Responsibility**: Core tui logic in src/tui/ui.rs
-- **Imports**: use crate :: tui :: activity , use crate :: tui :: app :: { App , InputMode , Tab } , use crate :: tui :: modals , use crate :: tui :: views , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Tabs } , Frame , } 
+- **Imports**: use crate :: tui :: activity , use crate :: tui :: app :: { App , InputMode , Tab } , use crate :: tui :: downloads , use crate :: tui :: modals , use crate :: tui :: views , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Tabs } , Frame , } 
 - **Public Functions & Signatures**:
   ```rust
   fn draw (frame : & mut Frame , app : & App)
@@ -221,7 +243,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_feed (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui.rs` (Role: tui, Lines: 285)
+### `src/tui.rs` (Role: tui, Lines: 304)
 - **Responsibility**: Core tui logic in src/tui.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: Duration 
 - **Public Functions & Signatures**:

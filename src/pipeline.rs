@@ -14,7 +14,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Transfer stage for visual progress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum TransferStage {
     Caching,
     Downloading,
@@ -22,7 +22,7 @@ pub enum TransferStage {
 }
 
 /// Real-time transfer statistics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TransferProgress {
     pub show: String,
     pub file_name: String,

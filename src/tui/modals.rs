@@ -28,8 +28,8 @@ pub fn render_help(frame: &mut Frame, area: Rect) {
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         )),
-        Line::from("  Tab / Shift-Tab  Cycle between views (Tracked, Feed, Activity)"),
-        Line::from("  1 / 2 / 3        Jump directly to view"),
+        Line::from("  Tab / Shift-Tab  Cycle between views (Tracked, Feed, Downloads, Activity)"),
+        Line::from("  1 / 2 / 3 / 4    Jump directly to view"),
         Line::from("  j / Down         Move cursor down"),
         Line::from("  k / Up           Move cursor up"),
         Line::from("  g / Home         Jump to top"),

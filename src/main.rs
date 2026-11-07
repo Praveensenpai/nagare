@@ -50,6 +50,8 @@ enum Command {
     Status,
     /// Check auth, feed, paths, and notification tooling.
     Doctor,
+    /// List downloaded episodes and active background transfer status.
+    Downloads,
     /// Launch the interactive terminal UI dashboard.
     Tui,
 }
@@ -71,5 +73,6 @@ async fn main() -> Result<()> {
         Some(Command::Scan) => commands::scan(&cfg, &db, cli.json).await,
         Some(Command::Status) => commands::status(&cfg, &db, cli.json).await,
         Some(Command::Doctor) => commands::doctor(&cfg, &db, cli.json).await,
+        Some(Command::Downloads) => commands::downloads(&cfg, &db, cli.json),
     }
 }

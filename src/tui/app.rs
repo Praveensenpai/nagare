@@ -15,8 +15,10 @@ pub enum Tab {
     Tracked = 0,
     /// Live SubsPlease release stream.
     Feed = 1,
+    /// Downloaded episodes and active transfer.
+    Downloads = 2,
     /// Seedr cloud and recent audit log.
-    Activity = 2,
+    Activity = 3,
 }
 
 impl Tab {
@@ -24,7 +26,8 @@ impl Tab {
     pub fn next(self) -> Self {
         match self {
             Self::Tracked => Self::Feed,
-            Self::Feed => Self::Activity,
+            Self::Feed => Self::Downloads,
+            Self::Downloads => Self::Activity,
             Self::Activity => Self::Tracked,
         }
     }
@@ -34,7 +37,8 @@ impl Tab {
         match self {
             Self::Tracked => Self::Activity,
             Self::Feed => Self::Tracked,
-            Self::Activity => Self::Feed,
+            Self::Downloads => Self::Feed,
+            Self::Activity => Self::Downloads,
         }
     }
 }
@@ -92,6 +96,8 @@ pub struct App {
     pub selected_feed: usize,
     pub feed_loading: bool,
     pub events: Vec<Event>,
+    pub releases: Vec<crate::db::GrabbedRelease>,
+    pub selected_release: usize,
     pub seedr_space: Option<(u64, u64)>,
     pub filter_input: String,
     pub add_title: String,
@@ -120,6 +126,8 @@ impl App {
             selected_feed: 0,
             feed_loading: false,
             events: Vec::new(),
+            releases: Vec::new(),
+            selected_release: 0,
             seedr_space: None,
             filter_input: String::new(),
             add_title: String::new(),
@@ -133,6 +141,7 @@ impl App {
             should_quit: false,
         };
         app.reload_shows();
+        app.reload_releases();
         app.reload_events();
         app
     }
@@ -143,6 +152,16 @@ impl App {
             self.shows = shows;
             if self.selected_show >= self.shows.len() && !self.shows.is_empty() {
                 self.selected_show = self.shows.len() - 1;
+            }
+        }
+    }
+
+    /// Reloads grabbed releases from SQLite.
+    pub fn reload_releases(&mut self) {
+        if let Ok(releases) = self.db.releases(100) {
+            self.releases = releases;
+            if self.selected_release >= self.releases.len() && !self.releases.is_empty() {
+                self.selected_release = self.releases.len() - 1;
             }
         }
     }

@@ -2,6 +2,7 @@
 
 use crate::tui::activity;
 use crate::tui::app::{App, InputMode, Tab};
+use crate::tui::downloads;
 use crate::tui::modals;
 use crate::tui::views;
 use ratatui::{
@@ -66,7 +67,12 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
         );
     frame.render_widget(brand, header_chunks[0]);
 
-    let tab_titles = vec!["[1] Tracked", "[2] Live Feed", "[3] Activity"];
+    let tab_titles = vec![
+        "[1] Tracked",
+        "[2] Live Feed",
+        "[3] Downloads",
+        "[4] Activity",
+    ];
     let tabs = Tabs::new(tab_titles)
         .block(
             Block::default()
@@ -111,6 +117,7 @@ fn render_body(frame: &mut Frame, area: Rect, app: &App) {
     match app.active_tab {
         Tab::Tracked => views::render_tracked(frame, area, app),
         Tab::Feed => views::render_feed(frame, area, app),
+        Tab::Downloads => downloads::render(frame, area, app),
         Tab::Activity => activity::render(frame, area, app),
     }
 }
@@ -278,6 +285,18 @@ fn footer_normal_line(tab: Tab) -> Line<'static> {
             Span::styled("[q] ", Style::default().fg(Color::Yellow)),
             Span::raw("Quit"),
         ]),
+        Tab::Downloads => Line::from(vec![
+            Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+            Span::raw("View  "),
+            Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Navigate  "),
+            Span::styled("[r] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scan/Run  "),
+            Span::styled("[?] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Help  "),
+            Span::styled("[q] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Quit"),
+        ]),
         Tab::Activity => Line::from(vec![
             Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
             Span::raw("View  "),
@@ -339,6 +358,9 @@ mod tests {
 
         app.active_tab = Tab::Feed;
         terminal.draw(|f| draw(f, &app)).expect("draw feed");
+
+        app.active_tab = Tab::Downloads;
+        terminal.draw(|f| draw(f, &app)).expect("draw downloads");
 
         app.active_tab = Tab::Activity;
         terminal.draw(|f| draw(f, &app)).expect("draw activity");
