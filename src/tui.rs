@@ -3,6 +3,7 @@
 pub mod activity;
 pub mod app;
 pub mod modals;
+pub mod transfer;
 pub mod ui;
 pub mod views;
 
@@ -68,7 +69,14 @@ async fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
 ) -> Result<()> {
+    let mut tracker = transfer::TransferTracker::default();
     while !app.should_quit {
+        let prev_active = app.active_transfer.is_some();
+        app.active_transfer = tracker.poll();
+        if prev_active && app.active_transfer.is_none() {
+            app.reload_shows();
+            app.reload_events();
+        }
         terminal.draw(|f| ui::draw(f, app))?;
         poll_and_handle_input(app).await?;
     }
@@ -228,7 +236,7 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
             app.input_mode = InputMode::Filtering;
         }
         KeyCode::Char('r') => {
-            let _ = app.run_pipeline().await;
+            app.trigger_background_pipeline();
         }
         _ => {}
     }

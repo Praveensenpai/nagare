@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::db::{Db, Event, Show};
 use crate::feed::{self, Item};
 use crate::matcher;
-use crate::pipeline::{self, Report};
+use crate::pipeline::TransferProgress;
 use anyhow::Result;
 use std::time::Instant;
 
@@ -99,10 +99,10 @@ pub struct App {
     pub add_episode: String,
     pub add_focus: AddField,
     pub track_prompt: Option<TrackPrompt>,
+    pub active_transfer: Option<TransferProgress>,
     pub show_help: bool,
     pub status_msg: Option<(String, Instant)>,
     pub should_quit: bool,
-    pub is_running_pipeline: bool,
 }
 
 impl App {
@@ -127,10 +127,10 @@ impl App {
             add_episode: "0".into(),
             add_focus: AddField::Title,
             track_prompt: None,
+            active_transfer: None,
             show_help: false,
             status_msg: None,
             should_quit: false,
-            is_running_pipeline: false,
         };
         app.reload_shows();
         app.reload_events();
@@ -323,15 +323,13 @@ impl App {
         Ok(())
     }
 
-    /// Triggers a manual pipeline scan and grab run.
-    pub async fn run_pipeline(&mut self) -> Result<Report> {
-        self.is_running_pipeline = true;
-        self.set_status("Scanning feed & running pipeline...");
-        let res = pipeline::run(&self.config, &mut self.db, false).await;
-        self.is_running_pipeline = false;
-        self.reload_shows();
-        self.reload_events();
-        res
+    /// Triggers a non-blocking background pipeline scan and grab run.
+    pub fn trigger_background_pipeline(&mut self) {
+        if let Err(err) = crate::tui::transfer::trigger_background_download() {
+            self.set_status(format!("Failed to trigger background daemon: {err}"));
+        } else {
+            self.set_status("Started background scheduler (nagare.service)");
+        }
     }
 
     /// Fetches the live feed items.

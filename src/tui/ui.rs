@@ -116,6 +116,11 @@ fn render_body(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
+    if let Some(transfer) = &app.active_transfer {
+        render_transfer_footer(frame, area, transfer);
+        return;
+    }
+
     let footer_text = if let Some(msg) = app.active_status() {
         Line::from(vec![
             Span::styled(" ● ", Style::default().fg(Color::Green)),
@@ -127,52 +132,115 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
             ),
         ])
     } else {
-        match app.input_mode {
-            InputMode::Normal => footer_normal_line(app.active_tab),
-            InputMode::Filtering => Line::from(vec![
-                Span::styled(
-                    "FILTER: ",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("Type query  "),
-                Span::styled("[Enter] ", Style::default().fg(Color::Green)),
-                Span::raw("Track & Exit  "),
-                Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Navigate  "),
-                Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
-                Span::raw("Cancel"),
-            ]),
-            InputMode::AddingShow => Line::from(vec![
-                Span::styled(
-                    "ADD SHOW: ",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("Fill details in modal dialog"),
-            ]),
-            InputMode::TrackPrompt => Line::from(vec![
-                Span::styled(
-                    "TRACK SHOW: ",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("[1-4] ", Style::default().fg(Color::Green)),
-                Span::raw("Quick Select  "),
-                Span::styled("[↑/↓] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Navigate  "),
-                Span::styled("[Enter] ", Style::default().fg(Color::Green)),
-                Span::raw("Confirm  "),
-                Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
-                Span::raw("Cancel"),
-            ]),
-        }
+        footer_input_mode_line(app.input_mode, app.active_tab)
     };
 
     let paragraph = Paragraph::new(footer_text).alignment(Alignment::Left);
+    frame.render_widget(paragraph, area);
+}
+
+fn footer_input_mode_line(mode: InputMode, tab: Tab) -> Line<'static> {
+    match mode {
+        InputMode::Normal => footer_normal_line(tab),
+        InputMode::Filtering => Line::from(vec![
+            Span::styled(
+                "FILTER: ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Type query  "),
+            Span::styled("[Enter] ", Style::default().fg(Color::Green)),
+            Span::raw("Track & Exit  "),
+            Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Navigate  "),
+            Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Cancel"),
+        ]),
+        InputMode::AddingShow => Line::from(vec![
+            Span::styled(
+                "ADD SHOW: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Fill details in modal dialog"),
+        ]),
+        InputMode::TrackPrompt => Line::from(vec![
+            Span::styled(
+                "TRACK SHOW: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("[1-4] ", Style::default().fg(Color::Green)),
+            Span::raw("Quick Select  "),
+            Span::styled("[↑/↓] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Navigate  "),
+            Span::styled("[Enter] ", Style::default().fg(Color::Green)),
+            Span::raw("Confirm  "),
+            Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Cancel"),
+        ]),
+    }
+}
+
+fn render_transfer_footer(
+    frame: &mut Frame,
+    area: Rect,
+    transfer: &crate::pipeline::TransferProgress,
+) {
+    let dl_mib = transfer.downloaded_bytes as f64 / (1024.0 * 1024.0);
+    let total_mib = transfer.total_bytes as f64 / (1024.0 * 1024.0);
+    let speed_mib = transfer.speed_bps as f64 / (1024.0 * 1024.0);
+
+    let info_line = match transfer.stage {
+        crate::pipeline::TransferStage::Caching => Line::from(vec![
+            Span::styled(
+                " ☁️  SEEDR CACHING: ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                &transfer.show,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(" ({})", transfer.file_name)),
+        ]),
+        crate::pipeline::TransferStage::Downloading => Line::from(vec![
+            Span::styled(
+                " ⏬ DOWNLOADING: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{:.1}% ", transfer.percent),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(
+                "• {dl_mib:.0}/{total_mib:.0} MiB • {speed_mib:.1} MB/s • ETA {}s • ",
+                transfer.eta_seconds
+            )),
+            Span::styled(&transfer.file_name, Style::default().fg(Color::White)),
+        ]),
+        crate::pipeline::TransferStage::Organizing => Line::from(vec![
+            Span::styled(
+                " 📁 ORGANIZING: ",
+                Style::default()
+                    .fg(Color::LightBlue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!("Placing {} in library...", transfer.show)),
+        ]),
+    };
+
+    let paragraph = Paragraph::new(info_line).alignment(Alignment::Left);
     frame.render_widget(paragraph, area);
 }
 

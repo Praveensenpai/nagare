@@ -9,7 +9,30 @@ use crate::organize;
 use anyhow::{bail, Context, Result};
 use seedr_dl::{load_auth, SeedrClient};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc::UnboundedSender;
+
+/// Transfer stage for visual progress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransferStage {
+    Caching,
+    Downloading,
+    Organizing,
+}
+
+/// Real-time transfer statistics.
+#[derive(Debug, Clone)]
+pub struct TransferProgress {
+    pub show: String,
+    pub file_name: String,
+    pub stage: TransferStage,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub speed_bps: u64,
+    pub eta_seconds: u64,
+    pub percent: f64,
+}
 
 /// Summary of one scheduler pass.
 #[derive(Debug, Default)]
@@ -35,11 +58,17 @@ impl Report {
 }
 
 /// Runs one scheduler pass.
-///
-/// # Errors
-/// Returns an error only for setup problems (database, feed fetch, missing
-/// auth). Per-release failures are collected in the returned report.
 pub async fn run(cfg: &Config, db: &mut Db, dry_run: bool) -> Result<Report> {
+    run_with_progress(cfg, db, dry_run, None).await
+}
+
+/// Runs one scheduler pass with optional progress reporting.
+pub async fn run_with_progress(
+    cfg: &Config,
+    db: &mut Db,
+    dry_run: bool,
+    progress: Option<UnboundedSender<TransferProgress>>,
+) -> Result<Report> {
     let mut report = Report::default();
     let shows = db.shows()?;
     if shows.is_empty() {
@@ -80,7 +109,7 @@ pub async fn run(cfg: &Config, db: &mut Db, dry_run: bool) -> Result<Report> {
         let Some(seedr) = client.as_ref() else {
             continue;
         };
-        match deliver(cfg, db, seedr, show.id, item).await {
+        match deliver(cfg, db, seedr, show.id, item, progress.as_ref()).await {
             Ok(path) => report.grabbed.push(path.display().to_string()),
             Err(err) => {
                 let msg = handle_deliver_error(cfg, db, item, &err).await?;
@@ -111,13 +140,26 @@ async fn deliver(
     client: &SeedrClient,
     show_id: i64,
     item: &Item,
+    progress: Option<&UnboundedSender<TransferProgress>>,
 ) -> Result<PathBuf> {
-    let folder = cache_folder(client, cfg, &item.magnet).await?;
+    send_stage_update(progress, item, TransferStage::Caching, 0.0);
+    let folder = cache_folder(client, cfg, &item.magnet, item, progress).await?;
+
+    let notifier = progress.map(|tx| {
+        let show = item.show.clone();
+        let tx = tx.clone();
+        seedr_dl::Notifier::new(seedr_dl::NotifierConfig {
+            callback_fn: Some(Arc::new(move |event| {
+                forward_seedr_progress(event, &show, &tx);
+            })),
+            ..Default::default()
+        })
+    });
 
     let transfer = seedr_dl::TransferOptions {
         output_dir: cfg.staging_dir.clone(),
         delete_cloud: true,
-        notifier: None,
+        notifier: notifier.as_ref(),
     };
     let seedr_cfg = seedr_dl::Config {
         download_dir: cfg.staging_dir.clone(),
@@ -126,10 +168,70 @@ async fn deliver(
     };
     let files = seedr_dl::transfer_download_folder(client, &seedr_cfg, &folder, &transfer).await?;
 
+    send_stage_update(progress, item, TransferStage::Organizing, 100.0);
     let placement = organize::plan(item);
     let placed = organize::place(&cfg.library_dir, &cfg.staging_dir, &placement, &files).await?;
     organize::refresh_jellyfin(&cfg.jellyfin).await?;
 
+    record_and_notify(cfg, db, show_id, item, &placed).await?;
+    Ok(placed)
+}
+
+fn send_stage_update(
+    progress: Option<&UnboundedSender<TransferProgress>>,
+    item: &Item,
+    stage: TransferStage,
+    percent: f64,
+) {
+    if let Some(tx) = progress {
+        let _ = tx.send(TransferProgress {
+            show: item.show.clone(),
+            file_name: item.title.clone(),
+            stage,
+            downloaded_bytes: (item.bytes as f64 * (percent / 100.0)) as u64,
+            total_bytes: item.bytes,
+            speed_bps: 0,
+            eta_seconds: 0,
+            percent,
+        });
+    }
+}
+
+fn forward_seedr_progress(
+    event: seedr_dl::NotificationEvent,
+    show: &str,
+    tx: &UnboundedSender<TransferProgress>,
+) {
+    if let seedr_dl::NotificationEvent::Progress {
+        file_name,
+        downloaded_bytes,
+        total_bytes,
+        speed_bps,
+        eta_seconds,
+        percentage,
+        ..
+    } = event
+    {
+        let _ = tx.send(TransferProgress {
+            show: show.to_string(),
+            file_name,
+            stage: TransferStage::Downloading,
+            downloaded_bytes,
+            total_bytes,
+            speed_bps,
+            eta_seconds,
+            percent: percentage,
+        });
+    }
+}
+
+async fn record_and_notify(
+    cfg: &Config,
+    db: &mut Db,
+    show_id: i64,
+    item: &Item,
+    placed: &std::path::Path,
+) -> Result<()> {
     db.record_release(
         &item.infohash,
         show_id,
@@ -152,22 +254,46 @@ async fn deliver(
         )
         .await;
     }
-    Ok(placed)
+    Ok(())
 }
 
 async fn cache_folder(
     client: &SeedrClient,
     cfg: &Config,
     magnet: &str,
+    item: &Item,
+    progress: Option<&UnboundedSender<TransferProgress>>,
 ) -> Result<seedr_dl::SeedrFolder> {
     let policy = seedr_dl::CachePolicy {
         max_wait: Duration::from_secs(cfg.max_wait_secs),
         min_free_bytes: cfg.min_free_bytes,
         ..seedr_dl::CachePolicy::default()
     };
+    let on_progress_cb = progress.map(|tx| {
+        let show = item.show.clone();
+        let total = item.bytes;
+        let tx = tx.clone();
+        move |torrent: &seedr_dl::SeedrTorrent| {
+            let prog = torrent.progress.unwrap_or(0.0);
+            let _ = tx.send(TransferProgress {
+                show: show.clone(),
+                file_name: torrent.name.clone(),
+                stage: TransferStage::Caching,
+                downloaded_bytes: (total as f64 * (prog / 100.0)) as u64,
+                total_bytes: total,
+                speed_bps: 0,
+                eta_seconds: 0,
+                percent: prog,
+            });
+        }
+    });
+    let on_prog_ref = on_progress_cb
+        .as_ref()
+        .map(|cb| cb as &(dyn Fn(&seedr_dl::SeedrTorrent) + Send + Sync));
+
     let opts = seedr_dl::EnsureOpts {
         policy,
-        on_progress: None,
+        on_progress: on_prog_ref,
     };
     match client.ensure_cached(magnet, &opts).await? {
         seedr_dl::CacheOutcome::Ready(folder) => Ok(folder),

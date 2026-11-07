@@ -33,13 +33,36 @@ fn render_cloud_card(frame: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
-            Constraint::Length(1),
+            Constraint::Length(3),
             Constraint::Min(4),
         ])
         .split(inner);
 
     render_storage_gauge(frame, rows[0], app.seedr_space);
+    if let Some(transfer) = &app.active_transfer {
+        render_active_transfer_gauge(frame, rows[1], transfer);
+    }
     render_storage_details(frame, rows[2], app);
+}
+
+fn render_active_transfer_gauge(
+    frame: &mut Frame,
+    area: Rect,
+    transfer: &crate::pipeline::TransferProgress,
+) {
+    let ratio = (transfer.percent / 100.0).clamp(0.0, 1.0);
+    let speed_mib = transfer.speed_bps as f64 / (1024.0 * 1024.0);
+    let label = format!(
+        "{:.1}% • {:.1} MB/s • ETA {}s",
+        transfer.percent, speed_mib, transfer.eta_seconds
+    );
+    let title = format!(" Active Transfer: {} ", transfer.show);
+    let gauge = Gauge::default()
+        .block(Block::default().title(title))
+        .gauge_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(20, 25, 35)))
+        .ratio(ratio)
+        .label(label);
+    frame.render_widget(gauge, area);
 }
 
 fn render_storage_gauge(frame: &mut Frame, area: Rect, space: Option<(u64, u64)>) {
