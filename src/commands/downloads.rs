@@ -10,7 +10,7 @@ use anyhow::Result;
 /// `nagare downloads`
 pub fn downloads(cfg: &Config, db: &Db, json: bool) -> Result<()> {
     let mut tracker = TransferTracker::default();
-    let active = tracker.poll();
+    let active = tracker.poll_with_sample(300);
     let releases = db.releases(100)?;
 
     if json {
@@ -80,7 +80,11 @@ fn print_human(
     }
 
     if releases.is_empty() {
-        println!("No downloaded episodes found.");
+        if active.is_some() {
+            println!("No completed downloads yet (1 transfer currently in progress).");
+        } else {
+            println!("No downloaded episodes found.");
+        }
         return;
     }
 

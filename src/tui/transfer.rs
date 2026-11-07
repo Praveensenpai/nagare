@@ -23,6 +23,8 @@ pub struct TransferTracker {
     last_bytes: u64,
     last_time: Instant,
     smoothed_speed: u64,
+    last_service_check: Instant,
+    service_active: bool,
 }
 
 impl Default for TransferTracker {
@@ -32,6 +34,8 @@ impl Default for TransferTracker {
             last_bytes: 0,
             last_time: Instant::now(),
             smoothed_speed: 0,
+            last_service_check: Instant::now() - std::time::Duration::from_secs(10),
+            service_active: false,
         }
     }
 }
@@ -62,7 +66,7 @@ impl TransferTracker {
                 eta_seconds: eta,
                 percent,
             })
-        } else if is_service_active() {
+        } else if self.check_service_cached() {
             Some(TransferProgress {
                 show: "Background Daemon".into(),
                 file_name: "Checking feed & Seedr cloud...".into(),
@@ -78,6 +82,25 @@ impl TransferTracker {
             self.last_bytes = 0;
             None
         }
+    }
+
+    /// Polls with a short delta sample to calculate transfer speed in one-shot CLI commands.
+    pub fn poll_with_sample(&mut self, sample_ms: u64) -> Option<TransferProgress> {
+        let first = self.poll();
+        if first.is_some() && sample_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(sample_ms));
+            self.poll()
+        } else {
+            first
+        }
+    }
+
+    fn check_service_cached(&mut self) -> bool {
+        if self.last_service_check.elapsed() > std::time::Duration::from_millis(1500) {
+            self.service_active = is_service_active();
+            self.last_service_check = Instant::now();
+        }
+        self.service_active
     }
 
     fn update_speed(&mut self, file_name: &str, downloaded: u64) -> u64 {
@@ -142,24 +165,26 @@ pub fn is_service_active() -> bool {
         .unwrap_or(false)
 }
 
-/// Triggers the background systemd service or detached worker process.
+/// Triggers the background systemd service or detached worker process asynchronously.
 pub fn trigger_background_download() -> std::io::Result<()> {
-    let status = std::process::Command::new("systemctl")
-        .args(["--user", "start", "nagare.service"])
-        .status();
+    std::thread::spawn(|| {
+        let status = std::process::Command::new("systemctl")
+            .args(["--user", "start", "--no-block", "nagare.service"])
+            .status();
 
-    if let Ok(s) = status {
-        if s.success() {
-            return Ok(());
+        if let Ok(s) = status {
+            if s.success() {
+                return;
+            }
         }
-    }
 
-    std::process::Command::new("nagare")
-        .arg("run")
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()?;
+        let _ = std::process::Command::new("nagare")
+            .arg("run")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    });
     Ok(())
 }
 

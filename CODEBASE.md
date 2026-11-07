@@ -15,7 +15,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
 
 ## 3. Module & Interface Skeleton
 
-### `src/commands/downloads.rs` (Role: general, Lines: 116)
+### `src/commands/downloads.rs` (Role: general, Lines: 120)
 - **Responsibility**: Core general logic in src/commands/downloads.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: { Db , GrabbedRelease } , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: transfer :: TransferTracker , use anyhow :: Result 
 - **Public Functions & Signatures**:
@@ -212,7 +212,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_track_modal (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui/transfer.rs` (Role: tui, Lines: 179)
+### `src/tui/transfer.rs` (Role: tui, Lines: 204)
 - **Responsibility**: Core tui logic in src/tui/transfer.rs
 - **Imports**: use crate :: pipeline :: { TransferProgress , TransferStage } , use serde :: Deserialize , use std :: fs , use std :: time :: Instant 
 - **Types & Enums**:
@@ -222,6 +222,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
 - **Public Functions & Signatures**:
   ```rust
   fn poll (& mut self) -> Option < TransferProgress >
+  fn poll_with_sample (& mut self , sample_ms : u64) -> Option < TransferProgress >
   fn is_service_active () -> bool
   fn trigger_background_download () -> std :: io :: Result < () >
   ```
