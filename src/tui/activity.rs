@@ -125,6 +125,14 @@ fn render_storage_details(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled("Feed:     ", Style::default().fg(Color::DarkGray)),
             Span::raw(app.config.feed_url.clone()),
         ]),
+        Line::from(vec![
+            Span::styled("Timer:    ", Style::default().fg(Color::DarkGray)),
+            Span::raw(
+                app.next_scan
+                    .as_deref()
+                    .unwrap_or("active (systemd timer)"),
+            ),
+        ]),
     ];
     frame.render_widget(Paragraph::new(details), area);
 }

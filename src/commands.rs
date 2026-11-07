@@ -218,6 +218,7 @@ pub async fn status(cfg: &Config, db: &Db, json: bool) -> Result<()> {
             serde_json::json!({
                 "feed_url": cfg.feed_url,
                 "library_dir": cfg.library_dir,
+                "next_run": crate::tui::transfer::timer_next_run(),
                 "seedr": space.as_ref().ok().map(|(max, used)| serde_json::json!({ "max": max, "used": used })),
                 "seedr_error": space.as_ref().err().map(ToString::to_string),
                 "events": events.iter().map(|event| serde_json::json!({
@@ -231,13 +232,14 @@ pub async fn status(cfg: &Config, db: &Db, json: bool) -> Result<()> {
         Ok((max, used)) => println!("seedr   {used} / {max} bytes used"),
         Err(err) => println!("seedr   unavailable ({err})"),
     }
+    let next_run = crate::tui::transfer::timer_next_run();
     let timer_active = check_systemd_timer();
     println!(
         "timer   {}",
-        if timer_active {
-            "active (scheduled)"
-        } else {
-            "inactive (systemctl --user enable --now nagare.timer)"
+        match (&next_run, timer_active) {
+            (Some(next), true) => format!("active (next: {next})"),
+            (None, true) => "active (scheduled)".into(),
+            (_, false) => "inactive (systemctl --user enable --now nagare.timer)".into(),
         }
     );
     println!("library {}", cfg.library_dir.display());

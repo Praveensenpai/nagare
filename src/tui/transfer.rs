@@ -165,6 +165,28 @@ pub fn is_service_active() -> bool {
         .unwrap_or(false)
 }
 
+/// Returns the exact timestamp of the next scheduled systemd timer run.
+#[must_use]
+pub fn timer_next_run() -> Option<String> {
+    let out = std::process::Command::new("systemctl")
+        .args([
+            "--user",
+            "show",
+            "nagare.timer",
+            "--property=NextElapseUSecRealtime",
+            "--value",
+        ])
+        .output()
+        .ok()?;
+    if out.status.success() {
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !text.is_empty() && text != "0" {
+            return Some(text);
+        }
+    }
+    None
+}
+
 /// Triggers the background systemd service or detached worker process asynchronously.
 pub fn trigger_background_download() -> std::io::Result<()> {
     std::thread::spawn(|| {

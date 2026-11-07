@@ -23,7 +23,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn downloads (cfg : & Config , db : & Db , json : bool) -> Result < () >
   ```
 
-### `src/commands.rs` (Role: general, Lines: 362)
+### `src/commands.rs` (Role: general, Lines: 364)
 - **Responsibility**: Core general logic in src/commands.rs
 - **Imports**: pub use downloads :: downloads , use crate :: config :: Config , use crate :: db :: Db , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline , use anyhow :: { bail , Context , Result } , use std :: collections :: BTreeMap , use std :: io :: Write 
 - **Public Functions & Signatures**:
@@ -149,7 +149,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn run_with_progress (cfg : & Config , db : & mut Db , dry_run : bool , progress : Option < UnboundedSender < TransferProgress > > ,) -> Result < Report >
   ```
 
-### `src/tui/activity.rs` (Role: tui, Lines: 183)
+### `src/tui/activity.rs` (Role: tui, Lines: 191)
 - **Responsibility**: Core tui logic in src/tui/activity.rs
 - **Imports**: use crate :: tui :: app :: App , use ratatui :: { layout :: { Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Gauge , Paragraph , Row , Table } , Frame , } 
 - **Public Functions & Signatures**:
@@ -157,7 +157,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui/app.rs` (Role: tui, Lines: 385)
+### `src/tui/app.rs` (Role: tui, Lines: 387)
 - **Responsibility**: Core tui logic in src/tui/app.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: { Db , Event , Show } , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline :: TransferProgress , use anyhow :: Result , use std :: time :: Instant 
 - **Types & Enums**:
@@ -193,7 +193,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
 - **Responsibility**: Core tui logic in src/tui/app_tests.rs
 - **Imports**: use super :: * , use std :: path :: { Path , PathBuf } 
 
-### `src/tui/downloads.rs` (Role: tui, Lines: 181)
+### `src/tui/downloads.rs` (Role: tui, Lines: 186)
 - **Responsibility**: Core tui logic in src/tui/downloads.rs
 - **Imports**: use crate :: db :: GrabbedRelease , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: app :: App , use ratatui :: { layout :: { Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Gauge , Paragraph , Row , Table } , Frame , } 
 - **Public Functions & Signatures**:
@@ -212,7 +212,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_track_modal (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui/transfer.rs` (Role: tui, Lines: 204)
+### `src/tui/transfer.rs` (Role: tui, Lines: 226)
 - **Responsibility**: Core tui logic in src/tui/transfer.rs
 - **Imports**: use crate :: pipeline :: { TransferProgress , TransferStage } , use serde :: Deserialize , use std :: fs , use std :: time :: Instant 
 - **Types & Enums**:
@@ -224,6 +224,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn poll (& mut self) -> Option < TransferProgress >
   fn poll_with_sample (& mut self , sample_ms : u64) -> Option < TransferProgress >
   fn is_service_active () -> bool
+  fn timer_next_run () -> Option < String >
   fn trigger_background_download () -> std :: io :: Result < () >
   ```
 

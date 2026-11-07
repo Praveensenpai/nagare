@@ -26,7 +26,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if let Some(transfer) = &app.active_transfer {
         render_active_card(frame, chunks[0], transfer);
     } else {
-        render_idle_card(frame, chunks[0]);
+        render_idle_card(frame, chunks[0], app);
     }
 
     render_downloads_table(frame, chunks[1], app);
@@ -68,17 +68,22 @@ fn render_active_card(frame: &mut Frame, area: Rect, transfer: &TransferProgress
     frame.render_widget(sub, rows[1]);
 }
 
-fn render_idle_card(frame: &mut Frame, area: Rect) {
+fn render_idle_card(frame: &mut Frame, area: Rect, app: &App) {
+    let next_str = app
+        .next_scan
+        .as_deref()
+        .map(|s| format!("• Next scan: {s} "))
+        .unwrap_or_else(|| "• Checks every 30m ".into());
     let line = Line::from(vec![
         Span::styled("● ", Style::default().fg(Color::Green)),
         Span::styled(
-            "Transfer Daemon Idle ",
+            "Daemon Idle ",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            "• Timer checks every 30m • Press [r] to poll immediately",
+            format!("{next_str}• Press [r] to poll immediately"),
             Style::default().fg(Color::DarkGray),
         ),
     ]);
