@@ -20,7 +20,7 @@ use crossterm::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::{Terminal, TerminalOptions, Viewport};
 use std::io::{stdout, IsTerminal, Stdout};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// RAII guard to ensure the terminal is restored even during panics or early returns.
 struct TerminalGuard;
@@ -71,18 +71,50 @@ async fn event_loop(
     app: &mut App,
 ) -> Result<()> {
     let mut tracker = transfer::TransferTracker::default();
+    let mut last_db_poll = Instant::now();
+    let mut last_space_poll = Instant::now();
+    let (space_tx, mut space_rx) = tokio::sync::mpsc::unbounded_channel();
+
     while !app.should_quit {
+        if let Ok(space) = space_rx.try_recv() {
+            app.seedr_space = space;
+        }
+
         let prev_active = app.active_transfer.is_some();
         app.active_transfer = tracker.poll();
-        if prev_active && app.active_transfer.is_none() {
+        let now = Instant::now();
+
+        if (prev_active && app.active_transfer.is_none())
+            || (!prev_active && app.active_transfer.is_some())
+            || now.duration_since(last_db_poll).as_secs() >= 1
+        {
             app.reload_shows();
             app.reload_releases();
             app.reload_events();
+            last_db_poll = now;
         }
+
+        if now.duration_since(last_space_poll).as_secs() >= 10 {
+            spawn_space_check(&space_tx);
+            last_space_poll = now;
+        }
+
         terminal.draw(|f| ui::draw(f, app))?;
         poll_and_handle_input(app).await?;
     }
     Ok(())
+}
+
+fn spawn_space_check(tx: &tokio::sync::mpsc::UnboundedSender<Option<(u64, u64)>>) {
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Ok(Some(auth)) = seedr_dl::load_auth() {
+            let client = seedr_dl::SeedrClient::new(auth.access_token);
+            if let Ok(space) = client.space().await {
+                let _ = tx.send(Some((space.max, space.used)));
+            }
+        }
+    });
 }
 
 async fn poll_and_handle_input(app: &mut App) -> Result<()> {
@@ -207,15 +239,13 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
         return Ok(());
     }
 
+    if handle_tab_navigation(app, key.code) {
+        return Ok(());
+    }
+
     match key.code {
         KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('?') => app.show_help = true,
-        KeyCode::Tab => app.active_tab = app.active_tab.next(),
-        KeyCode::BackTab => app.active_tab = app.active_tab.prev(),
-        KeyCode::Char('1') => app.active_tab = Tab::Tracked,
-        KeyCode::Char('2') => app.active_tab = Tab::Feed,
-        KeyCode::Char('3') => app.active_tab = Tab::Downloads,
-        KeyCode::Char('4') => app.active_tab = Tab::Activity,
         KeyCode::Char('j') | KeyCode::Down => move_selection(app, 1),
         KeyCode::Char('k') | KeyCode::Up => move_selection(app, -1),
         KeyCode::Char('g') | KeyCode::Home => jump_selection(app, false),
@@ -244,6 +274,22 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
         _ => {}
     }
     Ok(())
+}
+
+fn handle_tab_navigation(app: &mut App, code: KeyCode) -> bool {
+    match code {
+        KeyCode::Tab => app.active_tab = app.active_tab.next(),
+        KeyCode::BackTab => app.active_tab = app.active_tab.prev(),
+        KeyCode::Char('1') => app.active_tab = Tab::Tracked,
+        KeyCode::Char('2') => app.active_tab = Tab::Feed,
+        KeyCode::Char('3') => app.active_tab = Tab::Downloads,
+        KeyCode::Char('4') => app.active_tab = Tab::Activity,
+        _ => return false,
+    }
+    app.reload_shows();
+    app.reload_releases();
+    app.reload_events();
+    true
 }
 
 fn move_selection(app: &mut App, delta: isize) {

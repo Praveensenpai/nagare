@@ -115,7 +115,7 @@ impl TransferTracker {
             return 0;
         }
 
-        if elapsed >= 0.5 {
+        if elapsed >= 0.25 {
             let delta = downloaded.saturating_sub(self.last_bytes);
             let instant_speed = (delta as f64 / elapsed) as u64;
             self.smoothed_speed = if self.smoothed_speed == 0 {

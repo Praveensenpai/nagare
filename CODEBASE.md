@@ -244,9 +244,9 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_feed (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui.rs` (Role: tui, Lines: 304)
+### `src/tui.rs` (Role: tui, Lines: 350)
 - **Responsibility**: Core tui logic in src/tui.rs
-- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: Duration 
+- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: { Duration , Instant } 
 - **Public Functions & Signatures**:
   ```rust
   async fn run (config : Config , db : Db) -> Result < () >
