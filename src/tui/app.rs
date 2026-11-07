@@ -48,6 +48,17 @@ pub enum InputMode {
     Filtering,
     /// Modal dialog open to add a custom show.
     AddingShow,
+    /// Modal dialog open to confirm tracking a feed release.
+    TrackPrompt,
+}
+
+/// State for the Track Show confirmation popup.
+#[derive(Debug, Clone)]
+pub struct TrackPrompt {
+    pub show: String,
+    pub season: u32,
+    pub episode: f64,
+    pub selected: usize,
 }
 
 /// Focused field inside the Add Show dialog.
@@ -87,6 +98,7 @@ pub struct App {
     pub add_season: String,
     pub add_episode: String,
     pub add_focus: AddField,
+    pub track_prompt: Option<TrackPrompt>,
     pub show_help: bool,
     pub status_msg: Option<(String, Instant)>,
     pub should_quit: bool,
@@ -114,6 +126,7 @@ impl App {
             add_season: "1".into(),
             add_episode: "0".into(),
             add_focus: AddField::Title,
+            track_prompt: None,
             show_help: false,
             status_msg: None,
             should_quit: false,
@@ -190,8 +203,8 @@ impl App {
         Ok(())
     }
 
-    /// Toggles tracking for the currently selected feed item.
-    pub fn toggle_track_selected_feed(&mut self) -> Result<()> {
+    /// Opens the track episode prompt for currently selected feed item.
+    pub fn open_track_prompt(&mut self) -> Result<()> {
         let Some(&idx) = self.filtered_feed.get(self.selected_feed) else {
             return Ok(());
         };
@@ -207,15 +220,78 @@ impl App {
             self.db.remove_show(id)?;
             self.db.log_event("untrack", &format!("untracked {name}"))?;
             self.set_status(format!("Untracked {name}"));
-        } else {
-            let season = item.season;
-            let episode = item.episode.unwrap_or(0.0);
-            self.db.add_show(&name, &name, season, episode)?;
-            self.db.log_event(
-                "track",
-                &format!("{name} after S{season:02}E{:02}", episode as u32),
-            )?;
-            self.set_status(format!("Tracking {name} (S{season:02}E{episode:02})"));
+            self.reload_shows();
+            self.reload_events();
+            return Ok(());
+        }
+
+        let season = item.season;
+        let episode = item.episode.unwrap_or(1.0);
+        self.track_prompt = Some(TrackPrompt {
+            show: name,
+            season,
+            episode,
+            selected: 0,
+        });
+        self.input_mode = InputMode::TrackPrompt;
+        Ok(())
+    }
+
+    /// Executes the selected option from the track episode prompt.
+    pub fn apply_track_prompt(&mut self, choice_idx: usize) -> Result<()> {
+        let Some(prompt) = self.track_prompt.take() else {
+            self.input_mode = InputMode::Normal;
+            return Ok(());
+        };
+
+        let name = prompt.show;
+        let season = prompt.season;
+        let episode = prompt.episode;
+
+        match choice_idx {
+            0 => {
+                let watermark = (episode - 1.0).max(0.0);
+                self.db.add_show(&name, &name, season, watermark)?;
+                self.db.log_event(
+                    "track",
+                    &format!("{name} including S{season:02}E{:02}", episode as u32),
+                )?;
+                self.set_status(format!(
+                    "Tracking {name} (from S{season:02}E{:02})",
+                    episode as u32
+                ));
+                self.input_mode = InputMode::Normal;
+            }
+            1 => {
+                self.db.add_show(&name, &name, season, episode)?;
+                self.db.log_event(
+                    "track",
+                    &format!("{name} after S{season:02}E{:02}", episode as u32),
+                )?;
+                self.set_status(format!(
+                    "Tracking {name} (after S{season:02}E{:02})",
+                    episode as u32
+                ));
+                self.input_mode = InputMode::Normal;
+            }
+            2 => {
+                self.db.add_show(&name, &name, season, 0.0)?;
+                self.db
+                    .log_event("track", &format!("{name} full season {season}"))?;
+                self.set_status(format!("Tracking {name} (S{season:02} complete)"));
+                self.input_mode = InputMode::Normal;
+            }
+            3 => {
+                self.add_title = name;
+                self.add_season = season.to_string();
+                let def_ep = ((episode - 1.0).max(0.0)) as u32;
+                self.add_episode = def_ep.to_string();
+                self.add_focus = AddField::Episode;
+                self.input_mode = InputMode::AddingShow;
+            }
+            _ => {
+                self.input_mode = InputMode::Normal;
+            }
         }
         self.reload_shows();
         self.reload_events();
@@ -288,102 +364,5 @@ impl App {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::{Path, PathBuf};
-
-    fn test_app() -> App {
-        let db = Db::open_at(Path::new(":memory:")).expect("memory db");
-        let config = Config {
-            library_dir: PathBuf::from("/tmp/library"),
-            feed_url: "https://example.com/rss".into(),
-            staging_dir: PathBuf::from("/tmp/staging"),
-            min_free_bytes: 1024,
-            max_wait_secs: 60,
-            download_threads: 1,
-            jellyfin: Default::default(),
-            notify: false,
-        };
-        App::new(config, db)
-    }
-
-    #[test]
-    fn tab_navigation_cycles() {
-        assert_eq!(Tab::Tracked.next(), Tab::Feed);
-        assert_eq!(Tab::Feed.next(), Tab::Activity);
-        assert_eq!(Tab::Activity.next(), Tab::Tracked);
-
-        assert_eq!(Tab::Tracked.prev(), Tab::Activity);
-        assert_eq!(Tab::Activity.prev(), Tab::Feed);
-        assert_eq!(Tab::Feed.prev(), Tab::Tracked);
-    }
-
-    #[test]
-    fn add_field_cycles() {
-        assert_eq!(AddField::Title.next(), AddField::Season);
-        assert_eq!(AddField::Season.next(), AddField::Episode);
-        assert_eq!(AddField::Episode.next(), AddField::Title);
-    }
-
-    #[test]
-    fn app_add_and_remove_show() {
-        let mut app = test_app();
-        assert!(app.shows.is_empty());
-
-        app.add_title = "Spy x Family".into();
-        app.add_season = "2".into();
-        app.add_episode = "12".into();
-        app.submit_add_modal().expect("submit add");
-
-        assert_eq!(app.shows.len(), 1);
-        assert_eq!(app.shows[0].title, "Spy x Family");
-        assert_eq!(app.shows[0].season, 2);
-        assert_eq!(app.shows[0].max_episode, 12.0);
-
-        app.remove_selected_show().expect("remove show");
-        assert!(app.shows.is_empty());
-    }
-
-    #[test]
-    fn filter_updates_indices() {
-        let mut app = test_app();
-        app.feed_items = vec![
-            Item {
-                title: "[SubsPlease] One Piece - 1089 (1080p).mkv".into(),
-                show: "One Piece".into(),
-                season: 1,
-                episode: Some(1089.0),
-                bytes: 1_000_000,
-                infohash: "hash1".into(),
-                is_batch: false,
-                magnet: "magnet:?".into(),
-                released: chrono::Utc::now(),
-            },
-            Item {
-                title: "[SubsPlease] Bleach - 24 (1080p).mkv".into(),
-                show: "Bleach".into(),
-                season: 1,
-                episode: Some(24.0),
-                bytes: 1_000_000,
-                infohash: "hash2".into(),
-                is_batch: false,
-                magnet: "magnet:?".into(),
-                released: chrono::Utc::now(),
-            },
-        ];
-
-        app.filter_input = "piece".into();
-        app.update_filter();
-        assert_eq!(app.filtered_feed.len(), 1);
-        assert_eq!(app.filtered_feed[0], 0);
-
-        app.filter_input = "bleach".into();
-        app.update_filter();
-        assert_eq!(app.filtered_feed.len(), 1);
-        assert_eq!(app.filtered_feed[0], 1);
-
-        app.filter_input.clear();
-        app.update_filter();
-        assert_eq!(app.filtered_feed.len(), 2);
-    }
-}
+#[path = "app_tests.rs"]
+mod tests;

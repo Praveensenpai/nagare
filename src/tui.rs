@@ -91,8 +91,41 @@ async fn poll_and_handle_input(app: &mut App) -> Result<()> {
 async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
     match app.input_mode {
         InputMode::AddingShow => handle_add_modal_key(app, key),
+        InputMode::TrackPrompt => handle_track_prompt_key(app, key),
         InputMode::Filtering => handle_filter_key(app, key),
         InputMode::Normal => handle_normal_key(app, key).await,
+    }
+}
+
+fn handle_track_prompt_key(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Char('1') => app.apply_track_prompt(0)?,
+        KeyCode::Char('2') => app.apply_track_prompt(1)?,
+        KeyCode::Char('3') => app.apply_track_prompt(2)?,
+        KeyCode::Char('4') => app.apply_track_prompt(3)?,
+        KeyCode::Up | KeyCode::Char('k') => adjust_prompt_selection(app, -1),
+        KeyCode::Down | KeyCode::Char('j') => adjust_prompt_selection(app, 1),
+        KeyCode::Enter => {
+            let sel = app.track_prompt.as_ref().map(|p| p.selected).unwrap_or(0);
+            app.apply_track_prompt(sel)?;
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.track_prompt = None;
+            app.input_mode = InputMode::Normal;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn adjust_prompt_selection(app: &mut App, delta: isize) {
+    let Some(prompt) = &mut app.track_prompt else {
+        return;
+    };
+    if delta < 0 {
+        prompt.selected = prompt.selected.saturating_sub(1);
+    } else if prompt.selected < 3 {
+        prompt.selected += 1;
     }
 }
 
@@ -131,8 +164,7 @@ fn handle_filter_key(app: &mut App, key: KeyEvent) -> Result<()> {
             app.update_filter();
         }
         KeyCode::Enter => {
-            app.toggle_track_selected_feed()?;
-            app.input_mode = InputMode::Normal;
+            app.open_track_prompt()?;
         }
         KeyCode::Down => move_selection(app, 1),
         KeyCode::Up => move_selection(app, -1),
@@ -182,7 +214,7 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
             app.remove_selected_show()?;
         }
         KeyCode::Enter | KeyCode::Char(' ') | KeyCode::Char('t') if app.active_tab == Tab::Feed => {
-            app.toggle_track_selected_feed()?;
+            app.open_track_prompt()?;
         }
         KeyCode::Enter if app.active_tab == Tab::Tracked => {
             if let Some(show) = app.shows.get(app.selected_show) {

@@ -155,3 +155,85 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         ])
         .split(popup_layout[1])[1]
 }
+
+/// Renders the Track Episode confirmation popup.
+pub fn render_track_modal(frame: &mut Frame, area: Rect, app: &App) {
+    let Some(prompt) = &app.track_prompt else {
+        return;
+    };
+    let popup_area = centered_rect(68, 45, area);
+    frame.render_widget(Clear, popup_area);
+
+    let ep_str = format!("S{:02}E{:02}", prompt.season, prompt.episode as u32);
+    let title = format!(" Track: {} ({ep_str}) ", prompt.show);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Cyan))
+        .title(title)
+        .title_alignment(Alignment::Center);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(5),
+            Constraint::Min(1),
+        ])
+        .split(inner);
+
+    let lines = build_track_modal_lines(prompt);
+    frame.render_widget(Paragraph::new(lines), chunks[1]);
+
+    let footer_text = Line::from(vec![
+        Span::styled("[1-4] ", Style::default().fg(Color::Green)),
+        Span::raw("Quick Select  "),
+        Span::styled("[↑/↓] ", Style::default().fg(Color::Cyan)),
+        Span::raw("Navigate  "),
+        Span::styled("[Enter] ", Style::default().fg(Color::Green)),
+        Span::raw("Confirm  "),
+        Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
+        Span::raw("Cancel"),
+    ]);
+    frame.render_widget(
+        Paragraph::new(footer_text).alignment(Alignment::Center),
+        chunks[2],
+    );
+}
+
+fn build_track_modal_lines(prompt: &crate::tui::app::TrackPrompt) -> Vec<Line<'static>> {
+    let ep = prompt.episode as u32;
+    let prev = ((prompt.episode - 1.0).max(0.0)) as u32;
+    let s = prompt.season;
+
+    let items = [
+        format!("[1] Include this episode (S{s:02}E{ep:02})       -> Starts at S{s:02}E{prev:02} (picks up current on next run)"),
+        format!("[2] Start after this episode (S{s:02}E{:02}+) -> Starts at S{s:02}E{ep:02} (monitors future only)", ep + 1),
+        format!("[3] Track full season (from S{s:02}E01)     -> Starts at S{s:02}E00 (catches entire season)"),
+        "[4] Custom parameters...                -> Pre-fills Add Show dialog with show details".to_string(),
+    ];
+
+    items
+        .into_iter()
+        .enumerate()
+        .map(|(idx, text)| {
+            let is_sel = prompt.selected == idx;
+            let style = if is_sel {
+                Style::default()
+                    .fg(Color::White)
+                    .bg(Color::Rgb(26, 42, 74))
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            let prefix = if is_sel { " ▶ " } else { "   " };
+            Line::from(vec![
+                Span::styled(prefix, Style::default().fg(Color::Cyan)),
+                Span::styled(text, style),
+            ])
+        })
+        .collect()
+}

@@ -228,6 +228,15 @@ pub async fn status(cfg: &Config, db: &Db, json: bool) -> Result<()> {
         Ok((max, used)) => println!("seedr   {used} / {max} bytes used"),
         Err(err) => println!("seedr   unavailable ({err})"),
     }
+    let timer_active = check_systemd_timer();
+    println!(
+        "timer   {}",
+        if timer_active {
+            "active (scheduled)"
+        } else {
+            "inactive (systemctl --user enable --now nagare.timer)"
+        }
+    );
     println!("library {}", cfg.library_dir.display());
     for event in events {
         println!("{}  {:<5}  {}", event.at, event.level, event.message);
@@ -237,6 +246,32 @@ pub async fn status(cfg: &Config, db: &Db, json: bool) -> Result<()> {
 
 /// `nagare doctor`
 pub async fn doctor(cfg: &Config, db: &Db, json: bool) -> Result<()> {
+    let checks = collect_checks(cfg, db).await?;
+
+    if json {
+        let rows: Vec<_> = checks
+            .iter()
+            .map(|(name, ok, detail)| {
+                serde_json::json!({ "check": name, "ok": ok, "detail": detail })
+            })
+            .collect();
+        println!("{}", serde_json::Value::Array(rows));
+    } else {
+        for (name, ok, detail) in &checks {
+            println!(
+                "{:<5} {:<11} {detail}",
+                if *ok { "ok" } else { "fail" },
+                name
+            );
+        }
+    }
+    if checks.iter().any(|(_, ok, _)| !ok) {
+        bail!("one or more checks failed");
+    }
+    Ok(())
+}
+
+async fn collect_checks<'a>(cfg: &'a Config, db: &'a Db) -> Result<Vec<(&'a str, bool, String)>> {
     let mut checks: Vec<(&str, bool, String)> = Vec::new();
 
     let auth = seedr_dl::load_auth();
@@ -271,28 +306,18 @@ pub async fn doctor(cfg: &Config, db: &Db, json: bool) -> Result<()> {
         "at least one tracked".into(),
     ));
     checks.push(("tayori", which("tayori"), "notifications".into()));
+    let timer_ok = check_systemd_timer();
+    checks.push((
+        "timer",
+        timer_ok,
+        if timer_ok {
+            "nagare.timer active".into()
+        } else {
+            "systemctl --user enable --now nagare.timer".into()
+        },
+    ));
 
-    if json {
-        let rows: Vec<_> = checks
-            .iter()
-            .map(|(name, ok, detail)| {
-                serde_json::json!({ "check": name, "ok": ok, "detail": detail })
-            })
-            .collect();
-        println!("{}", serde_json::Value::Array(rows));
-    } else {
-        for (name, ok, detail) in &checks {
-            println!(
-                "{:<5} {:<11} {detail}",
-                if *ok { "ok" } else { "fail" },
-                name
-            );
-        }
-    }
-    if checks.iter().any(|(_, ok, _)| !ok) {
-        bail!("one or more checks failed");
-    }
-    Ok(())
+    Ok(checks)
 }
 
 async fn seedr_space() -> Result<(u64, u64)> {
@@ -305,6 +330,14 @@ async fn seedr_space() -> Result<(u64, u64)> {
 fn which(binary: &str) -> bool {
     std::env::var_os("PATH")
         .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(binary).is_file()))
+}
+
+fn check_systemd_timer() -> bool {
+    std::process::Command::new("systemctl")
+        .args(["--user", "is-active", "--quiet", "nagare.timer"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 fn catalog(items: &[Item]) -> BTreeMap<String, (u32, f64)> {

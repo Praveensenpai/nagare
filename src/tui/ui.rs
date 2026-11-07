@@ -37,6 +37,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
         modals::render_help(frame, size);
     } else if app.input_mode == InputMode::AddingShow {
         modals::render_add_modal(frame, size, app);
+    } else if app.input_mode == InputMode::TrackPrompt {
+        modals::render_track_modal(frame, size, app);
     }
 }
 
@@ -150,6 +152,22 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("Fill details in modal dialog"),
+            ]),
+            InputMode::TrackPrompt => Line::from(vec![
+                Span::styled(
+                    "TRACK SHOW: ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("[1-4] ", Style::default().fg(Color::Green)),
+                Span::raw("Quick Select  "),
+                Span::styled("[↑/↓] ", Style::default().fg(Color::Cyan)),
+                Span::raw("Navigate  "),
+                Span::styled("[Enter] ", Style::default().fg(Color::Green)),
+                Span::raw("Confirm  "),
+                Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
+                Span::raw("Cancel"),
             ]),
         }
     };
