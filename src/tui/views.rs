@@ -177,7 +177,7 @@ fn render_feed_table(frame: &mut Frame, area: Rect, app: &App) {
         });
 
     let title = format!(
-        " Live Feed ({}/{} items) — [t] Track Highlighted ",
+        " Live Feed ({}/{} items) — [Enter/Space] Track/Untrack ",
         app.filtered_feed.len(),
         app.feed_items.len()
     );

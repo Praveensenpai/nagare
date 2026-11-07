@@ -126,32 +126,19 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
         ])
     } else {
         match app.input_mode {
-            InputMode::Normal => Line::from(vec![
-                Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
-                Span::raw("View  "),
-                Span::styled("[r] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Scan/Run  "),
-                Span::styled("[a] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Add  "),
-                Span::styled("[d] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Delete  "),
-                Span::styled("[/] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Filter  "),
-                Span::styled("[?] ", Style::default().fg(Color::Cyan)),
-                Span::raw("Help  "),
-                Span::styled("[q] ", Style::default().fg(Color::Yellow)),
-                Span::raw("Quit"),
-            ]),
+            InputMode::Normal => footer_normal_line(app.active_tab),
             InputMode::Filtering => Line::from(vec![
                 Span::styled(
-                    "FILTER MODE: ",
+                    "FILTER: ",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::raw("Type title pattern  "),
+                Span::raw("Type query  "),
                 Span::styled("[Enter] ", Style::default().fg(Color::Green)),
-                Span::raw("Apply  "),
+                Span::raw("Track & Exit  "),
+                Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
+                Span::raw("Navigate  "),
                 Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
                 Span::raw("Cancel"),
             ]),
@@ -169,6 +156,53 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
 
     let paragraph = Paragraph::new(footer_text).alignment(Alignment::Left);
     frame.render_widget(paragraph, area);
+}
+
+fn footer_normal_line(tab: Tab) -> Line<'static> {
+    match tab {
+        Tab::Feed => Line::from(vec![
+            Span::styled("[Enter/Space] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Track  "),
+            Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Navigate  "),
+            Span::styled("[/] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Filter  "),
+            Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+            Span::raw("View  "),
+            Span::styled("[r] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scan/Run  "),
+            Span::styled("[?] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Help  "),
+            Span::styled("[q] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Quit"),
+        ]),
+        Tab::Tracked => Line::from(vec![
+            Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+            Span::raw("View  "),
+            Span::styled("[Enter] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Feed  "),
+            Span::styled("[a] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Add  "),
+            Span::styled("[d] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Delete  "),
+            Span::styled("[r] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scan/Run  "),
+            Span::styled("[?] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Help  "),
+            Span::styled("[q] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Quit"),
+        ]),
+        Tab::Activity => Line::from(vec![
+            Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
+            Span::raw("View  "),
+            Span::styled("[r] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scan/Run  "),
+            Span::styled("[?] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Help  "),
+            Span::styled("[q] ", Style::default().fg(Color::Yellow)),
+            Span::raw("Quit"),
+        ]),
+    }
 }
 
 fn render_too_small(frame: &mut Frame, area: Rect) {

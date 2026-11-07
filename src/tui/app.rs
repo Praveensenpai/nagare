@@ -190,8 +190,8 @@ impl App {
         Ok(())
     }
 
-    /// Tracks the show corresponding to currently selected feed item.
-    pub fn track_selected_feed(&mut self) -> Result<()> {
+    /// Toggles tracking for the currently selected feed item.
+    pub fn toggle_track_selected_feed(&mut self) -> Result<()> {
         let Some(&idx) = self.filtered_feed.get(self.selected_feed) else {
             return Ok(());
         };
@@ -199,15 +199,24 @@ impl App {
             return Ok(());
         };
         let name = item.show.clone();
-        let season = item.season;
-        let episode = item.episode.unwrap_or(0.0);
 
-        self.db.add_show(&name, &name, season, episode)?;
-        self.db.log_event(
-            "track",
-            &format!("{name} after S{season:02}E{:02}", episode as u32),
-        )?;
-        self.set_status(format!("Tracking {name} (S{season:02}E{episode:02})"));
+        if let Some(existing) = self.shows.iter().find(|s| {
+            s.title.eq_ignore_ascii_case(&name) || s.match_title.eq_ignore_ascii_case(&name)
+        }) {
+            let id = existing.id;
+            self.db.remove_show(id)?;
+            self.db.log_event("untrack", &format!("untracked {name}"))?;
+            self.set_status(format!("Untracked {name}"));
+        } else {
+            let season = item.season;
+            let episode = item.episode.unwrap_or(0.0);
+            self.db.add_show(&name, &name, season, episode)?;
+            self.db.log_event(
+                "track",
+                &format!("{name} after S{season:02}E{:02}", episode as u32),
+            )?;
+            self.set_status(format!("Tracking {name} (S{season:02}E{episode:02})"));
+        }
         self.reload_shows();
         self.reload_events();
         Ok(())

@@ -141,7 +141,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui/app.rs` (Role: tui, Lines: 380)
+### `src/tui/app.rs` (Role: tui, Lines: 389)
 - **Responsibility**: Core tui logic in src/tui/app.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: { Db , Event , Show } , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline :: { self , Report } , use anyhow :: Result , use std :: time :: Instant 
 - **Types & Enums**:
@@ -163,7 +163,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn active_status (& self) -> Option < & str >
   fn update_filter (& mut self)
   fn remove_selected_show (& mut self) -> Result < () >
-  fn track_selected_feed (& mut self) -> Result < () >
+  fn toggle_track_selected_feed (& mut self) -> Result < () >
   fn submit_add_modal (& mut self) -> Result < () >
   async fn run_pipeline (& mut self) -> Result < Report >
   async fn fetch_feed (& mut self) -> Result < () >
@@ -180,7 +180,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn centered_rect (percent_x : u16 , percent_y : u16 , area : Rect) -> Rect
   ```
 
-### `src/tui/ui.rs` (Role: tui, Lines: 233)
+### `src/tui/ui.rs` (Role: tui, Lines: 267)
 - **Responsibility**: Core tui logic in src/tui/ui.rs
 - **Imports**: use crate :: tui :: activity , use crate :: tui :: app :: { App , InputMode , Tab } , use crate :: tui :: modals , use crate :: tui :: views , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Tabs } , Frame , } 
 - **Public Functions & Signatures**:
@@ -197,7 +197,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn render_feed (frame : & mut Frame , area : Rect , app : & App)
   ```
 
-### `src/tui.rs` (Role: tui, Lines: 231)
+### `src/tui.rs` (Role: tui, Lines: 245)
 - **Responsibility**: Core tui logic in src/tui.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: Duration 
 - **Public Functions & Signatures**:

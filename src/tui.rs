@@ -131,8 +131,11 @@ fn handle_filter_key(app: &mut App, key: KeyEvent) -> Result<()> {
             app.update_filter();
         }
         KeyCode::Enter => {
+            app.toggle_track_selected_feed()?;
             app.input_mode = InputMode::Normal;
         }
+        KeyCode::Down => move_selection(app, 1),
+        KeyCode::Up => move_selection(app, -1),
         KeyCode::Backspace => {
             app.filter_input.pop();
             app.update_filter();
@@ -175,8 +178,19 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Char('g') | KeyCode::Home => jump_selection(app, false),
         KeyCode::Char('G') | KeyCode::End => jump_selection(app, true),
         KeyCode::Char('a') => app.input_mode = InputMode::AddingShow,
-        KeyCode::Char('d') if app.active_tab == Tab::Tracked => app.remove_selected_show()?,
-        KeyCode::Char('t') if app.active_tab == Tab::Feed => app.track_selected_feed()?,
+        KeyCode::Char('d') | KeyCode::Delete if app.active_tab == Tab::Tracked => {
+            app.remove_selected_show()?;
+        }
+        KeyCode::Enter | KeyCode::Char(' ') | KeyCode::Char('t') if app.active_tab == Tab::Feed => {
+            app.toggle_track_selected_feed()?;
+        }
+        KeyCode::Enter if app.active_tab == Tab::Tracked => {
+            if let Some(show) = app.shows.get(app.selected_show) {
+                app.filter_input = show.title.clone();
+                app.update_filter();
+                app.active_tab = Tab::Feed;
+            }
+        }
         KeyCode::Char('/') => {
             app.active_tab = Tab::Feed;
             app.input_mode = InputMode::Filtering;
