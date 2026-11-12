@@ -1,6 +1,6 @@
 [package]
 name = "nagare"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 description = "Weekly anime RSS scheduler that delivers through Seedr and purges the cloud"
 license = "MIT"

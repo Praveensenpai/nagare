@@ -15,7 +15,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
 
 ## 3. Module & Interface Skeleton
 
-### `src/commands/downloads.rs` (Role: general, Lines: 120)
+### `src/commands/downloads.rs` (Role: general, Lines: 118)
 - **Responsibility**: Core general logic in src/commands/downloads.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: { Db , GrabbedRelease } , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: transfer :: TransferTracker , use anyhow :: Result 
 - **Public Functions & Signatures**:
@@ -52,7 +52,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn load () -> Result < Config >
   ```
 
-### `src/db.rs` (Role: general, Lines: 355)
+### `src/db.rs` (Role: general, Lines: 357)
 - **Responsibility**: Core general logic in src/db.rs
 - **Imports**: use crate :: config , use anyhow :: { Context , Result } , use rusqlite :: { params , Connection , OptionalExtension } , use std :: path :: Path 
 - **Types & Enums**:
@@ -116,7 +116,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn alert (title : & str , body : & str)
   ```
 
-### `src/organize.rs` (Role: general, Lines: 181)
+### `src/organize.rs` (Role: general, Lines: 184)
 - **Responsibility**: Core general logic in src/organize.rs
 - **Imports**: use crate :: config :: Jellyfin , use crate :: feed :: Item , use anyhow :: { Context , Result } , use std :: path :: { Path , PathBuf } 
 - **Types & Enums**:
@@ -149,17 +149,17 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn run_with_progress (cfg : & Config , db : & mut Db , dry_run : bool , progress : Option < UnboundedSender < TransferProgress > > ,) -> Result < Report >
   ```
 
-### `src/tui/activity.rs` (Role: tui, Lines: 191)
+### `src/tui/activity.rs` (Role: tui, Lines: 214)
 - **Responsibility**: Core tui logic in src/tui/activity.rs
 - **Imports**: use crate :: tui :: app :: App , use ratatui :: { layout :: { Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Gauge , Paragraph , Row , Table } , Frame , } 
 - **Public Functions & Signatures**:
   ```rust
-  fn render (frame : & mut Frame , area : Rect , app : & App)
+  fn render (frame : & mut Frame , area : Rect , app : & mut App)
   ```
 
-### `src/tui/app.rs` (Role: tui, Lines: 387)
+### `src/tui/app.rs` (Role: tui, Lines: 391)
 - **Responsibility**: Core tui logic in src/tui/app.rs
-- **Imports**: use crate :: config :: Config , use crate :: db :: { Db , Event , Show } , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline :: TransferProgress , use anyhow :: Result , use std :: time :: Instant 
+- **Imports**: use crate :: config :: Config , use crate :: db :: { Db , Event , Show } , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: pipeline :: TransferProgress , use anyhow :: Result , use ratatui :: widgets :: TableState , use std :: time :: Instant 
 - **Types & Enums**:
   ```rust
   pub enum Tab
@@ -189,16 +189,16 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   async fn fetch_space (& mut self)
   ```
 
-### `src/tui/app_tests.rs` (Role: tui, Lines: 135)
+### `src/tui/app_tests.rs` (Role: tui, Lines: 182)
 - **Responsibility**: Core tui logic in src/tui/app_tests.rs
 - **Imports**: use super :: * , use std :: path :: { Path , PathBuf } 
 
-### `src/tui/downloads.rs` (Role: tui, Lines: 186)
+### `src/tui/downloads.rs` (Role: tui, Lines: 204)
 - **Responsibility**: Core tui logic in src/tui/downloads.rs
 - **Imports**: use crate :: db :: GrabbedRelease , use crate :: organize , use crate :: pipeline :: TransferProgress , use crate :: tui :: app :: App , use ratatui :: { layout :: { Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Gauge , Paragraph , Row , Table } , Frame , } 
 - **Public Functions & Signatures**:
   ```rust
-  fn render (frame : & mut Frame , area : Rect , app : & App)
+  fn render (frame : & mut Frame , area : Rect , app : & mut App)
   ```
 
 ### `src/tui/modals.rs` (Role: tui, Lines: 239)
@@ -228,26 +228,27 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn trigger_background_download () -> std :: io :: Result < () >
   ```
 
-### `src/tui/ui.rs` (Role: tui, Lines: 375)
+### `src/tui/ui.rs` (Role: tui, Lines: 381)
 - **Responsibility**: Core tui logic in src/tui/ui.rs
 - **Imports**: use crate :: tui :: activity , use crate :: tui :: app :: { App , InputMode , Tab } , use crate :: tui :: downloads , use crate :: tui :: modals , use crate :: tui :: views , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Tabs } , Frame , } 
 - **Public Functions & Signatures**:
   ```rust
-  fn draw (frame : & mut Frame , app : & App)
+  fn draw (frame : & mut Frame , app : & mut App)
   ```
 
-### `src/tui/views.rs` (Role: tui, Lines: 280)
+### `src/tui/views.rs` (Role: tui, Lines: 315)
 - **Responsibility**: Core tui logic in src/tui/views.rs
-- **Imports**: use crate :: db :: Show , use crate :: feed :: Item , use crate :: tui :: app :: { App , InputMode } , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Row , Table } , Frame , } 
+- **Imports**: use crate :: db :: Show , use crate :: feed :: Item , use crate :: tui :: app :: { App , InputMode } , use ratatui :: { layout :: { Alignment , Constraint , Direction , Layout , Margin , Rect } , style :: { Color , Modifier , Style } , text :: { Line , Span } , widgets :: { Block , BorderType , Borders , Paragraph , Row , Scrollbar , ScrollbarOrientation , ScrollbarState , Table , } , Frame , } 
 - **Public Functions & Signatures**:
   ```rust
-  fn render_tracked (frame : & mut Frame , area : Rect , app : & App)
-  fn render_feed (frame : & mut Frame , area : Rect , app : & App)
+  fn render_table_scrollbar (frame : & mut Frame , area : Rect , count : usize , position : usize)
+  fn render_tracked (frame : & mut Frame , area : Rect , app : & mut App)
+  fn render_feed (frame : & mut Frame , area : Rect , app : & mut App)
   ```
 
-### `src/tui.rs` (Role: tui, Lines: 350)
+### `src/tui.rs` (Role: tui, Lines: 383)
 - **Responsibility**: Core tui logic in src/tui.rs
-- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: { Duration , Instant } 
+- **Imports**: use crate :: config :: Config , use crate :: db :: Db , use anyhow :: { bail , Context , Result } , use app :: { AddField , App , InputMode , Tab } , use crossterm :: { event :: { self , DisableMouseCapture , EnableMouseCapture , Event , KeyCode , KeyEvent , KeyEventKind , KeyModifiers , MouseEvent , MouseEventKind , } , execute , terminal :: { disable_raw_mode , enable_raw_mode , EnterAlternateScreen , LeaveAlternateScreen } , } , use ratatui :: backend :: CrosstermBackend , use ratatui :: { Terminal , TerminalOptions , Viewport } , use std :: io :: { stdout , IsTerminal , Stdout } , use std :: time :: { Duration , Instant } 
 - **Public Functions & Signatures**:
   ```rust
   async fn run (config : Config , db : Db) -> Result < () >

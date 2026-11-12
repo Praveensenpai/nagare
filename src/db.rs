@@ -345,8 +345,10 @@ mod tests {
     fn list_releases_newest_first() {
         let mut db = mem();
         let id = db.add_show("Show", "show", 1, 0.0).expect("add");
-        db.record_release("H1", id, 1, 1.0, "Show - 01", 100).expect("rec1");
-        db.record_release("H2", id, 1, 2.0, "Show - 02", 200).expect("rec2");
+        db.record_release("H1", id, 1, 1.0, "Show - 01", 100)
+            .expect("rec1");
+        db.record_release("H2", id, 1, 2.0, "Show - 02", 200)
+            .expect("rec2");
         let rels = db.releases(10).expect("rels");
         assert_eq!(rels.len(), 2);
         assert_eq!(rels[0].episode, 2.0);

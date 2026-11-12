@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 /// Renders the Activity & Seedr Cloud status view.
-pub fn render(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
@@ -127,18 +127,14 @@ fn render_storage_details(frame: &mut Frame, area: Rect, app: &App) {
         ]),
         Line::from(vec![
             Span::styled("Timer:    ", Style::default().fg(Color::DarkGray)),
-            Span::raw(
-                app.next_scan
-                    .as_deref()
-                    .unwrap_or("active (systemd timer)"),
-            ),
+            Span::raw(app.next_scan.as_deref().unwrap_or("active (systemd timer)")),
         ]),
     ];
     frame.render_widget(Paragraph::new(details), area);
 }
 
-fn render_events_log(frame: &mut Frame, area: Rect, app: &App) {
-    let header_cells = ["Timestamp", "Level", "Event Message"]
+fn events_header<'a>() -> Row<'a> {
+    let cells = ["", "Timestamp", "Level", "Event Message"]
         .into_iter()
         .map(|h| {
             Span::styled(
@@ -148,37 +144,63 @@ fn render_events_log(frame: &mut Frame, area: Rect, app: &App) {
                     .add_modifier(Modifier::BOLD),
             )
         });
-    let header = Row::new(header_cells).height(1).bottom_margin(1);
+    Row::new(cells).height(1).bottom_margin(1)
+}
 
-    let rows = app.events.iter().map(|event| {
-        let level_color = match event.level.as_str() {
-            "grab" => Color::Green,
-            "track" => Color::Cyan,
-            "error" => Color::Red,
-            _ => Color::DarkGray,
-        };
-        let level_pill = Span::styled(
-            format!("[{}]", event.level),
-            Style::default().fg(level_color),
-        );
+fn build_event_row<'a>(event: &'a crate::db::Event, is_selected: bool) -> Row<'a> {
+    let level_color = match event.level.as_str() {
+        "grab" => Color::Green,
+        "track" => Color::Cyan,
+        "error" => Color::Red,
+        _ => Color::DarkGray,
+    };
+    let level_pill = Span::styled(
+        format!("[{}]", event.level),
+        Style::default().fg(level_color),
+    );
+    let prefix = if is_selected { "▶ " } else { "  " };
+    let style = if is_selected {
+        Style::default()
+            .fg(Color::White)
+            .bg(Color::Rgb(26, 42, 74))
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
 
-        Row::new(vec![
-            Span::styled(&event.at, Style::default().fg(Color::DarkGray)),
-            level_pill,
-            Span::raw(&event.message),
-        ])
-        .height(1)
-    });
+    Row::new(vec![
+        Span::styled(prefix, Style::default().fg(Color::Cyan)),
+        Span::styled(&event.at, Style::default().fg(Color::DarkGray)),
+        level_pill,
+        Span::raw(&event.message),
+    ])
+    .style(style)
+    .height(1)
+}
+
+fn render_events_log(frame: &mut Frame, area: Rect, app: &mut App) {
+    if !app.events.is_empty() {
+        app.activity_state.select(Some(app.selected_event));
+    } else {
+        app.activity_state.select(None);
+    }
+
+    let rows = app
+        .events
+        .iter()
+        .enumerate()
+        .map(|(idx, event)| build_event_row(event, idx == app.selected_event));
 
     let table = Table::new(
         rows,
         [
+            Constraint::Length(2),
             Constraint::Length(20),
             Constraint::Length(10),
             Constraint::Min(20),
         ],
     )
-    .header(header)
+    .header(events_header())
     .block(
         Block::default()
             .borders(Borders::ALL)
@@ -187,5 +209,6 @@ fn render_events_log(frame: &mut Frame, area: Rect, app: &App) {
             .title(format!(" Activity Audit Log ({}) ", app.events.len())),
     );
 
-    frame.render_widget(table, area);
+    frame.render_stateful_widget(table, area, &mut app.activity_state);
+    crate::tui::views::render_table_scrollbar(frame, area, app.events.len(), app.selected_event);
 }

@@ -13,7 +13,7 @@ use ratatui::{
 };
 
 /// Renders the Downloads tab.
-pub fn render(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(if app.active_transfer.is_some() {
@@ -63,8 +63,8 @@ fn render_active_card(frame: &mut Frame, area: Rect, transfer: &TransferProgress
         .label(label);
     frame.render_widget(gauge, rows[0]);
 
-    let sub = Paragraph::new(format!("File: {}", transfer.show))
-        .style(Style::default().fg(Color::Gray));
+    let sub =
+        Paragraph::new(format!("File: {}", transfer.show)).style(Style::default().fg(Color::Gray));
     frame.render_widget(sub, rows[1]);
 }
 
@@ -96,7 +96,20 @@ fn render_idle_card(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(paragraph, area);
 }
 
-fn render_downloads_table(frame: &mut Frame, area: Rect, app: &App) {
+fn downloads_header<'a>() -> Row<'a> {
+    Row::new(vec![
+        Span::raw(""),
+        Span::styled("Show Title", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled("S/E", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled("Size", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled("Grabbed At", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled("Status", Style::default().add_modifier(Modifier::BOLD)),
+    ])
+    .style(Style::default().fg(Color::Cyan))
+    .bottom_margin(1)
+}
+
+fn render_downloads_table(frame: &mut Frame, area: Rect, app: &mut App) {
     let title = format!(" Grabbed Releases ({}) ", app.releases.len());
     let block = Block::default()
         .borders(Borders::ALL)
@@ -105,22 +118,15 @@ fn render_downloads_table(frame: &mut Frame, area: Rect, app: &App) {
         .title(title);
 
     if app.releases.is_empty() {
-        let empty = Paragraph::new("No episodes downloaded yet. Track a show and press [r] to grab.")
-            .style(Style::default().fg(Color::DarkGray))
-            .block(block);
+        let empty =
+            Paragraph::new("No episodes downloaded yet. Track a show and press [r] to grab.")
+                .style(Style::default().fg(Color::DarkGray))
+                .block(block);
         frame.render_widget(empty, area);
         return;
     }
 
-    let header = Row::new(vec![
-        Span::styled("Show Title", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled("S/E", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled("Size", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled("Grabbed At", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled("Status", Style::default().add_modifier(Modifier::BOLD)),
-    ])
-    .style(Style::default().fg(Color::Cyan))
-    .bottom_margin(1);
+    app.downloads_state.select(Some(app.selected_release));
 
     let rows: Vec<Row> = app
         .releases
@@ -130,14 +136,23 @@ fn render_downloads_table(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let widths = [
+        Constraint::Length(2),
         Constraint::Percentage(40),
         Constraint::Length(8),
         Constraint::Length(10),
         Constraint::Length(18),
         Constraint::Length(14),
     ];
-    let table = Table::new(rows, widths).header(header).block(block);
-    frame.render_widget(table, area);
+    let table = Table::new(rows, widths)
+        .header(downloads_header())
+        .block(block);
+    frame.render_stateful_widget(table, area, &mut app.downloads_state);
+    crate::tui::views::render_table_scrollbar(
+        frame,
+        area,
+        app.releases.len(),
+        app.selected_release,
+    );
 }
 
 fn make_release_row<'a>(app: &App, rel: &'a GrabbedRelease, selected: bool) -> Row<'a> {
@@ -153,9 +168,11 @@ fn make_release_row<'a>(app: &App, rel: &'a GrabbedRelease, selected: bool) -> R
         Span::styled("✖ Missing", Style::default().fg(Color::Red))
     };
 
+    let prefix = if selected { "▶ " } else { "  " };
     let style = if selected {
         Style::default()
-            .fg(Color::Cyan)
+            .fg(Color::White)
+            .bg(Color::Rgb(26, 42, 74))
             .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
@@ -166,6 +183,7 @@ fn make_release_row<'a>(app: &App, rel: &'a GrabbedRelease, selected: bool) -> R
     let date_str = rel.grabbed_at.chars().take(16).collect::<String>();
 
     Row::new(vec![
+        Span::styled(prefix, Style::default().fg(Color::Cyan)),
         Span::raw(rel.show_title.as_str()),
         Span::raw(se),
         Span::raw(size_str),

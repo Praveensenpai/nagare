@@ -136,7 +136,10 @@ pub fn expected_path(library: &Path, show: &str, season: u32, episode: f64) -> P
     library
         .join(&clean)
         .join(format!("Season {:02}", season))
-        .join(format!("{clean} - S{:02}E{:02}.mkv", season, episode as u32))
+        .join(format!(
+            "{clean} - S{:02}E{:02}.mkv",
+            season, episode as u32
+        ))
 }
 
 /// Checks if an episode's video file exists on disk in the library.

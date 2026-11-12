@@ -133,3 +133,50 @@ fn track_prompt_options() {
     app.open_track_prompt().expect("toggle untrack");
     assert!(app.shows.is_empty());
 }
+
+#[test]
+fn feed_state_initializes_with_none_or_selected() {
+    let app = test_app();
+    assert_eq!(app.selected_feed, 0);
+    assert_eq!(app.selected_show, 0);
+    assert_eq!(app.selected_release, 0);
+    assert_eq!(app.selected_event, 0);
+    assert_eq!(app.feed_state.selected(), None);
+}
+
+#[test]
+fn events_reload_clamps_selected_event() {
+    let mut app = test_app();
+    app.selected_event = 10;
+    app.reload_events();
+    assert_eq!(app.selected_event, 0);
+}
+
+#[test]
+fn feed_scrolling_tracks_deep_selection() {
+    let mut app = test_app();
+    app.active_tab = Tab::Feed;
+    app.feed_items = (0..50)
+        .map(|i| Item {
+            title: format!("[SubsPlease] Show {i} - 01 (1080p).mkv"),
+            show: format!("Show {i}"),
+            season: 1,
+            episode: Some(1.0),
+            bytes: 1_000_000,
+            infohash: format!("hash{i}"),
+            is_batch: false,
+            magnet: "magnet:?".into(),
+            released: chrono::Utc::now(),
+        })
+        .collect();
+    app.filtered_feed = (0..50).collect();
+    app.selected_feed = 35;
+
+    let backend = ratatui::backend::TestBackend::new(100, 25);
+    let mut terminal = ratatui::Terminal::new(backend).expect("terminal");
+    terminal
+        .draw(|f| crate::tui::ui::draw(f, &mut app))
+        .expect("draw scrolled feed");
+    assert_eq!(app.feed_state.selected(), Some(35));
+    assert!(app.feed_state.offset() > 0);
+}

@@ -4,21 +4,37 @@ use crate::db::Show;
 use crate::feed::Item;
 use crate::tui::app::{App, InputMode};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Row, Table},
+    widgets::{
+        Block, BorderType, Borders, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table,
+    },
     Frame,
 };
 
-/// Renders the Tracked Shows table and metadata.
-pub fn render_tracked(frame: &mut Frame, area: Rect, app: &App) {
-    if app.shows.is_empty() {
-        render_empty_tracked(frame, area);
+/// Renders a vertical scrollbar on the right border of a table.
+pub fn render_table_scrollbar(frame: &mut Frame, area: Rect, count: usize, position: usize) {
+    if count == 0 {
         return;
     }
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("▲"))
+        .end_symbol(Some("▼"));
+    let mut state = ScrollbarState::new(count).position(position);
+    frame.render_stateful_widget(
+        scrollbar,
+        area.inner(Margin {
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut state,
+    );
+}
 
-    let header_cells = [
+fn tracked_header<'a>() -> Row<'a> {
+    let cells = [
         "",
         "ID",
         "Anime Title",
@@ -35,7 +51,16 @@ pub fn render_tracked(frame: &mut Frame, area: Rect, app: &App) {
                 .add_modifier(Modifier::BOLD),
         )
     });
-    let header = Row::new(header_cells).height(1).bottom_margin(1);
+    Row::new(cells).height(1).bottom_margin(1)
+}
+
+/// Renders the Tracked Shows table and metadata.
+pub fn render_tracked(frame: &mut Frame, area: Rect, app: &mut App) {
+    if app.shows.is_empty() {
+        render_empty_tracked(frame, area);
+        return;
+    }
+    app.tracked_state.select(Some(app.selected_show));
 
     let rows = app
         .shows
@@ -55,7 +80,7 @@ pub fn render_tracked(frame: &mut Frame, area: Rect, app: &App) {
             Constraint::Min(14),
         ],
     )
-    .header(header)
+    .header(tracked_header())
     .block(
         Block::default()
             .borders(Borders::ALL)
@@ -64,7 +89,8 @@ pub fn render_tracked(frame: &mut Frame, area: Rect, app: &App) {
             .title(title),
     );
 
-    frame.render_widget(table, area);
+    frame.render_stateful_widget(table, area, &mut app.tracked_state);
+    render_table_scrollbar(frame, area, app.shows.len(), app.selected_show);
 }
 
 fn render_empty_tracked(frame: &mut Frame, area: Rect) {
@@ -124,7 +150,7 @@ fn build_show_row<'a>(show: &Show, is_selected: bool) -> Row<'a> {
 }
 
 /// Renders the Live SubsPlease Feed table and filter bar.
-pub fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
+pub fn render_feed(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(5)])
@@ -150,8 +176,8 @@ fn render_feed_loading(frame: &mut Frame, area: Rect) {
     frame.render_widget(loading_widget, area);
 }
 
-fn render_feed_table(frame: &mut Frame, area: Rect, app: &App) {
-    let header_cells = ["", "Show Name", "Release", "Size", "Type", "Status"]
+fn feed_header<'a>() -> Row<'a> {
+    let cells = ["", "Show Name", "Release", "Size", "Type", "Status"]
         .into_iter()
         .map(|h| {
             Span::styled(
@@ -161,7 +187,15 @@ fn render_feed_table(frame: &mut Frame, area: Rect, app: &App) {
                     .add_modifier(Modifier::BOLD),
             )
         });
-    let header = Row::new(header_cells).height(1).bottom_margin(1);
+    Row::new(cells).height(1).bottom_margin(1)
+}
+
+fn render_feed_table(frame: &mut Frame, area: Rect, app: &mut App) {
+    if !app.filtered_feed.is_empty() {
+        app.feed_state.select(Some(app.selected_feed));
+    } else {
+        app.feed_state.select(None);
+    }
 
     let rows = app
         .filtered_feed
@@ -192,7 +226,7 @@ fn render_feed_table(frame: &mut Frame, area: Rect, app: &App) {
             Constraint::Min(12),
         ],
     )
-    .header(header)
+    .header(feed_header())
     .block(
         Block::default()
             .borders(Borders::ALL)
@@ -201,7 +235,8 @@ fn render_feed_table(frame: &mut Frame, area: Rect, app: &App) {
             .title(title),
     );
 
-    frame.render_widget(table, area);
+    frame.render_stateful_widget(table, area, &mut app.feed_state);
+    render_table_scrollbar(frame, area, app.filtered_feed.len(), app.selected_feed);
 }
 
 fn render_feed_filter(frame: &mut Frame, area: Rect, app: &App) {

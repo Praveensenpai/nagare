@@ -13,7 +13,10 @@ use crate::db::Db;
 use anyhow::{bail, Context, Result};
 use app::{AddField, App, InputMode, Tab};
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        KeyModifiers, MouseEvent, MouseEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -27,8 +30,8 @@ struct TerminalGuard;
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        let _ = execute!(stdout(), DisableMouseCapture, LeaveAlternateScreen);
         let _ = disable_raw_mode();
-        let _ = execute!(stdout(), LeaveAlternateScreen);
     }
 }
 
@@ -40,13 +43,14 @@ pub async fn run(config: Config, db: Db) -> Result<()> {
 
     enable_raw_mode().context("failed to enable terminal raw mode")?;
     let mut out = stdout();
-    execute!(out, EnterAlternateScreen).context("failed to enter alternate screen")?;
+    execute!(out, EnterAlternateScreen, EnableMouseCapture)
+        .context("failed to enter alternate screen")?;
     let _guard = TerminalGuard;
 
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
+        let _ = execute!(stdout(), DisableMouseCapture, LeaveAlternateScreen);
         let _ = disable_raw_mode();
-        let _ = execute!(stdout(), LeaveAlternateScreen);
         original_hook(info);
     }));
 
@@ -121,13 +125,32 @@ async fn poll_and_handle_input(app: &mut App) -> Result<()> {
     if !event::poll(Duration::from_millis(100))? {
         return Ok(());
     }
-    let Event::Key(key) = event::read()? else {
-        return Ok(());
-    };
-    if key.kind == KeyEventKind::Press {
-        handle_key(app, key).await?;
+    match event::read()? {
+        Event::Key(key) if key.kind == KeyEventKind::Press => {
+            handle_key(app, key).await?;
+        }
+        Event::Mouse(mouse) => {
+            handle_mouse(app, mouse);
+        }
+        _ => {}
     }
     Ok(())
+}
+
+fn handle_mouse(app: &mut App, mouse: MouseEvent) {
+    match mouse.kind {
+        MouseEventKind::ScrollDown => match app.input_mode {
+            InputMode::TrackPrompt => adjust_prompt_selection(app, 1),
+            InputMode::AddingShow => {}
+            _ => move_selection(app, 3),
+        },
+        MouseEventKind::ScrollUp => match app.input_mode {
+            InputMode::TrackPrompt => adjust_prompt_selection(app, -1),
+            InputMode::AddingShow => {}
+            _ => move_selection(app, -3),
+        },
+        _ => {}
+    }
 }
 
 async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
@@ -210,6 +233,8 @@ fn handle_filter_key(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         KeyCode::Down => move_selection(app, 1),
         KeyCode::Up => move_selection(app, -1),
+        KeyCode::PageDown => move_selection(app, 10),
+        KeyCode::PageUp => move_selection(app, -10),
         KeyCode::Backspace => {
             app.filter_input.pop();
             app.update_filter();
@@ -248,6 +273,8 @@ async fn handle_normal_key(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Char('?') => app.show_help = true,
         KeyCode::Char('j') | KeyCode::Down => move_selection(app, 1),
         KeyCode::Char('k') | KeyCode::Up => move_selection(app, -1),
+        KeyCode::PageDown => move_selection(app, 10),
+        KeyCode::PageUp => move_selection(app, -10),
         KeyCode::Char('g') | KeyCode::Home => jump_selection(app, false),
         KeyCode::Char('G') | KeyCode::End => jump_selection(app, true),
         KeyCode::Char('a') => app.input_mode = InputMode::AddingShow,
@@ -316,7 +343,13 @@ fn move_selection(app: &mut App, delta: isize) {
                 app.selected_release = next;
             }
         }
-        Tab::Activity => {}
+        Tab::Activity => {
+            if !app.events.is_empty() {
+                let next = (app.selected_event as isize + delta)
+                    .clamp(0, app.events.len() as isize - 1) as usize;
+                app.selected_event = next;
+            }
+        }
     }
 }
 
@@ -338,13 +371,13 @@ fn jump_selection(app: &mut App, to_end: bool) {
         }
         Tab::Downloads => {
             if !app.releases.is_empty() {
-                app.selected_release = if to_end {
-                    app.releases.len() - 1
-                } else {
-                    0
-                };
+                app.selected_release = if to_end { app.releases.len() - 1 } else { 0 };
             }
         }
-        Tab::Activity => {}
+        Tab::Activity => {
+            if !app.events.is_empty() {
+                app.selected_event = if to_end { app.events.len() - 1 } else { 0 };
+            }
+        }
     }
 }

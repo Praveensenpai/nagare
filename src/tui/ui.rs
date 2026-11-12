@@ -14,7 +14,7 @@ use ratatui::{
 };
 
 /// Draws the complete frame layout.
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     let size = frame.area();
     if size.width < 60 || size.height < 14 {
         render_too_small(frame, size);
@@ -113,7 +113,7 @@ fn render_space_badge(frame: &mut Frame, area: Rect, space: Option<(u64, u64)>) 
     frame.render_widget(space_badge, area);
 }
 
-fn render_body(frame: &mut Frame, area: Rect, app: &App) {
+fn render_body(frame: &mut Frame, area: Rect, app: &mut App) {
     match app.active_tab {
         Tab::Tracked => views::render_tracked(frame, area, app),
         Tab::Feed => views::render_feed(frame, area, app),
@@ -300,6 +300,8 @@ fn footer_normal_line(tab: Tab) -> Line<'static> {
         Tab::Activity => Line::from(vec![
             Span::styled("[Tab] ", Style::default().fg(Color::Cyan)),
             Span::raw("View  "),
+            Span::styled("[↓/↑] ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scroll  "),
             Span::styled("[r] ", Style::default().fg(Color::Cyan)),
             Span::raw("Scan/Run  "),
             Span::styled("[?] ", Style::default().fg(Color::Cyan)),
@@ -354,22 +356,26 @@ mod tests {
         let mut app = test_app();
 
         app.active_tab = Tab::Tracked;
-        terminal.draw(|f| draw(f, &app)).expect("draw tracked");
+        terminal.draw(|f| draw(f, &mut app)).expect("draw tracked");
 
         app.active_tab = Tab::Feed;
-        terminal.draw(|f| draw(f, &app)).expect("draw feed");
+        terminal.draw(|f| draw(f, &mut app)).expect("draw feed");
 
         app.active_tab = Tab::Downloads;
-        terminal.draw(|f| draw(f, &app)).expect("draw downloads");
+        terminal
+            .draw(|f| draw(f, &mut app))
+            .expect("draw downloads");
 
         app.active_tab = Tab::Activity;
-        terminal.draw(|f| draw(f, &app)).expect("draw activity");
+        terminal.draw(|f| draw(f, &mut app)).expect("draw activity");
 
         app.show_help = true;
-        terminal.draw(|f| draw(f, &app)).expect("draw help");
+        terminal.draw(|f| draw(f, &mut app)).expect("draw help");
         app.show_help = false;
 
         app.input_mode = InputMode::AddingShow;
-        terminal.draw(|f| draw(f, &app)).expect("draw add modal");
+        terminal
+            .draw(|f| draw(f, &mut app))
+            .expect("draw add modal");
     }
 }

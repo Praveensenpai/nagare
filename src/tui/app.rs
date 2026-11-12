@@ -6,6 +6,7 @@ use crate::feed::{self, Item};
 use crate::matcher;
 use crate::pipeline::TransferProgress;
 use anyhow::Result;
+use ratatui::widgets::TableState;
 use std::time::Instant;
 
 /// Active top-level view tab.
@@ -98,6 +99,11 @@ pub struct App {
     pub events: Vec<Event>,
     pub releases: Vec<crate::db::GrabbedRelease>,
     pub selected_release: usize,
+    pub selected_event: usize,
+    pub tracked_state: TableState,
+    pub feed_state: TableState,
+    pub downloads_state: TableState,
+    pub activity_state: TableState,
     pub seedr_space: Option<(u64, u64)>,
     pub filter_input: String,
     pub add_title: String,
@@ -110,6 +116,14 @@ pub struct App {
     pub show_help: bool,
     pub status_msg: Option<(String, Instant)>,
     pub should_quit: bool,
+}
+
+fn clamp_idx(idx: &mut usize, len: usize) {
+    if len == 0 {
+        *idx = 0;
+    } else if *idx >= len {
+        *idx = len - 1;
+    }
 }
 
 impl App {
@@ -129,6 +143,11 @@ impl App {
             events: Vec::new(),
             releases: Vec::new(),
             selected_release: 0,
+            selected_event: 0,
+            tracked_state: TableState::default(),
+            feed_state: TableState::default(),
+            downloads_state: TableState::default(),
+            activity_state: TableState::default(),
             seedr_space: None,
             filter_input: String::new(),
             add_title: String::new(),
@@ -151,26 +170,23 @@ impl App {
     /// Reloads tracked shows from SQLite.
     pub fn reload_shows(&mut self) {
         if let Ok(shows) = self.db.shows() {
+            clamp_idx(&mut self.selected_show, shows.len());
             self.shows = shows;
-            if self.selected_show >= self.shows.len() && !self.shows.is_empty() {
-                self.selected_show = self.shows.len() - 1;
-            }
         }
     }
 
     /// Reloads grabbed releases from SQLite.
     pub fn reload_releases(&mut self) {
         if let Ok(releases) = self.db.releases(100) {
+            clamp_idx(&mut self.selected_release, releases.len());
             self.releases = releases;
-            if self.selected_release >= self.releases.len() && !self.releases.is_empty() {
-                self.selected_release = self.releases.len() - 1;
-            }
         }
     }
 
     /// Reloads recent audit log events from SQLite.
     pub fn reload_events(&mut self) {
-        if let Ok(events) = self.db.recent_events(30) {
+        if let Ok(events) = self.db.recent_events(50) {
+            clamp_idx(&mut self.selected_event, events.len());
             self.events = events;
         }
     }
@@ -183,11 +199,7 @@ impl App {
     /// Returns active status message if within its 5-second display window.
     pub fn active_status(&self) -> Option<&str> {
         let (msg, when) = self.status_msg.as_ref()?;
-        if when.elapsed().as_secs() < 5 {
-            Some(msg.as_str())
-        } else {
-            None
-        }
+        (when.elapsed().as_secs() < 5).then_some(msg.as_str())
     }
 
     /// Updates the filtered indices when feed items or filter text changes.
@@ -198,16 +210,11 @@ impl App {
             .iter()
             .enumerate()
             .filter_map(|(idx, item)| {
-                if needle.is_empty() || matcher::normalize(&item.show).contains(&needle) {
-                    Some(idx)
-                } else {
-                    None
-                }
+                (needle.is_empty() || matcher::normalize(&item.show).contains(&needle))
+                    .then_some(idx)
             })
             .collect();
-        if self.selected_feed >= self.filtered_feed.len() && !self.filtered_feed.is_empty() {
-            self.selected_feed = self.filtered_feed.len() - 1;
-        }
+        clamp_idx(&mut self.selected_feed, self.filtered_feed.len());
     }
 
     /// Removes currently selected show from database.
@@ -271,8 +278,8 @@ impl App {
 
         match choice_idx {
             0 => {
-                let watermark = (episode - 1.0).max(0.0);
-                self.db.add_show(&name, &name, season, watermark)?;
+                let wm = (episode - 1.0).max(0.0);
+                self.db.add_show(&name, &name, season, wm)?;
                 self.db.log_event(
                     "track",
                     &format!("{name} including S{season:02}E{:02}", episode as u32),
@@ -305,14 +312,11 @@ impl App {
             3 => {
                 self.add_title = name;
                 self.add_season = season.to_string();
-                let def_ep = ((episode - 1.0).max(0.0)) as u32;
-                self.add_episode = def_ep.to_string();
+                self.add_episode = ((episode - 1.0).max(0.0) as u32).to_string();
                 self.add_focus = AddField::Episode;
                 self.input_mode = InputMode::AddingShow;
             }
-            _ => {
-                self.input_mode = InputMode::Normal;
-            }
+            _ => self.input_mode = InputMode::Normal,
         }
         self.reload_shows();
         self.reload_events();

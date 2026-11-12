@@ -35,12 +35,8 @@ fn print_json(
                 rel.season,
                 rel.episode,
             );
-            let path = organize::expected_path(
-                &cfg.library_dir,
-                &rel.show_title,
-                rel.season,
-                rel.episode,
-            );
+            let path =
+                organize::expected_path(&cfg.library_dir, &rel.show_title, rel.season, rel.episode);
             serde_json::json!({
                 "show": rel.show_title,
                 "season": rel.season,
@@ -63,11 +59,7 @@ fn print_json(
     Ok(())
 }
 
-fn print_human(
-    active: &Option<TransferProgress>,
-    releases: &[GrabbedRelease],
-    cfg: &Config,
-) {
+fn print_human(active: &Option<TransferProgress>, releases: &[GrabbedRelease], cfg: &Config) {
     if let Some(t) = active {
         let speed = t.speed_bps as f64 / (1024.0 * 1024.0);
         let dl = t.downloaded_bytes as f64 / (1024.0 * 1024.0);
@@ -88,15 +80,18 @@ fn print_human(
         return;
     }
 
-    println!("{:<32} {:<8} {:<10} {:<18} STATUS", "SHOW", "S/E", "SIZE", "GRABBED");
+    println!(
+        "{:<32} {:<8} {:<10} {:<18} STATUS",
+        "SHOW", "S/E", "SIZE", "GRABBED"
+    );
     for rel in releases {
-        let on_disk = organize::exists_on_disk(
-            &cfg.library_dir,
-            &rel.show_title,
-            rel.season,
-            rel.episode,
-        );
-        let status = if on_disk { "✔ on disk" } else { "✖ missing" };
+        let on_disk =
+            organize::exists_on_disk(&cfg.library_dir, &rel.show_title, rel.season, rel.episode);
+        let status = if on_disk {
+            "✔ on disk"
+        } else {
+            "✖ missing"
+        };
         let se = format!("S{:02}E{:02}", rel.season, rel.episode as u32);
         let size = format_size(rel.bytes);
         let date = rel.grabbed_at.chars().take(16).collect::<String>();
@@ -105,7 +100,10 @@ fn print_human(
         } else {
             rel.show_title.clone()
         };
-        println!("{:<32} {:<8} {:<10} {:<18} {}", show, se, size, date, status);
+        println!(
+            "{:<32} {:<8} {:<10} {:<18} {}",
+            show, se, size, date, status
+        );
     }
 }
 
