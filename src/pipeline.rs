@@ -143,7 +143,13 @@ async fn deliver(
     progress: Option<&UnboundedSender<TransferProgress>>,
 ) -> Result<PathBuf> {
     send_stage_update(progress, item, TransferStage::Caching, 0.0);
-    let folder = cache_folder(client, cfg, &item.magnet, item, progress).await?;
+    let (folder, purged) = cache_folder(client, cfg, item, progress).await?;
+    if purged > 0 {
+        db.log_event(
+            "purge",
+            &format!("freed cloud space by deleting {purged} completed folder(s)"),
+        )?;
+    }
 
     let notifier = progress.map(|tx| {
         let show = item.show.clone();
@@ -260,13 +266,13 @@ async fn record_and_notify(
 async fn cache_folder(
     client: &SeedrClient,
     cfg: &Config,
-    magnet: &str,
     item: &Item,
     progress: Option<&UnboundedSender<TransferProgress>>,
-) -> Result<seedr_dl::SeedrFolder> {
+) -> Result<(seedr_dl::SeedrFolder, usize)> {
+    let needed = needed_free_bytes(item.bytes, cfg.min_free_bytes);
     let policy = seedr_dl::CachePolicy {
         max_wait: Duration::from_secs(cfg.max_wait_secs),
-        min_free_bytes: cfg.min_free_bytes,
+        min_free_bytes: needed,
         ..seedr_dl::CachePolicy::default()
     };
     let on_progress_cb = progress.map(|tx| {
@@ -295,13 +301,76 @@ async fn cache_folder(
         policy,
         on_progress: on_prog_ref,
     };
-    match client.ensure_cached(magnet, &opts).await? {
+    match client.ensure_cached(&item.magnet, &opts).await? {
+        seedr_dl::CacheOutcome::Ready(folder) => Ok((folder, 0)),
+        seedr_dl::CacheOutcome::Timeout { progress, .. } => {
+            bail!("Seedr cache timed out at {progress:.0}%")
+        }
+        seedr_dl::CacheOutcome::NotEnoughSpace { free, needed } => {
+            let purged = purge_completed_cloud(client, &item.magnet).await?;
+            if purged > 0 {
+                let folder = retry_ensure_cached(client, &item.magnet, &opts).await?;
+                Ok((folder, purged))
+            } else {
+                bail!("Seedr free space {free} below required {needed}")
+            }
+        }
+    }
+}
+
+async fn retry_ensure_cached(
+    client: &SeedrClient,
+    magnet: &str,
+    opts: &seedr_dl::EnsureOpts<'_>,
+) -> Result<seedr_dl::SeedrFolder> {
+    match client.ensure_cached(magnet, opts).await? {
         seedr_dl::CacheOutcome::Ready(folder) => Ok(folder),
         seedr_dl::CacheOutcome::Timeout { progress, .. } => {
             bail!("Seedr cache timed out at {progress:.0}%")
         }
         seedr_dl::CacheOutcome::NotEnoughSpace { free, needed } => {
-            bail!("Seedr free space {free} below required {needed}")
+            bail!("Seedr free space {free} below required {needed} after cloud purge")
         }
+    }
+}
+
+async fn purge_completed_cloud(client: &SeedrClient, magnet: &str) -> Result<usize> {
+    let target_name = seedr_dl::extract_magnet_name(magnet);
+    let root = client.list_root().await?;
+    let to_delete: Vec<_> = root
+        .folders
+        .into_iter()
+        .filter(|f| target_name.as_deref() != Some(&f.name))
+        .collect();
+    if to_delete.is_empty() {
+        return Ok(0);
+    }
+    let count = to_delete.len();
+    client.delete_all_folders(&to_delete).await?;
+    Ok(count)
+}
+
+const fn needed_free_bytes(item_bytes: u64, min_free_bytes: u64) -> u64 {
+    if item_bytes > 0 {
+        item_bytes.saturating_add(50 * 1024 * 1024)
+    } else {
+        min_free_bytes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_needed_free_bytes_zero() {
+        assert_eq!(needed_free_bytes(0, 2048), 2048);
+    }
+
+    #[test]
+    fn test_needed_free_bytes_with_size() {
+        let size = 1_000_000_000;
+        let margin = 50 * 1024 * 1024;
+        assert_eq!(needed_free_bytes(size, 2048), size + margin);
     }
 }

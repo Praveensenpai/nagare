@@ -133,7 +133,7 @@ Entrypoint ──> CLI/Parser ──> Domain Logic ──> Infra/IO
   fn exists_on_disk (library : & Path , show : & str , season : u32 , episode : f64) -> bool
   ```
 
-### `src/pipeline.rs` (Role: general, Lines: 307)
+### `src/pipeline.rs` (Role: general, Lines: 376)
 - **Responsibility**: Core general logic in src/pipeline.rs
 - **Imports**: use crate :: config :: Config , use crate :: db :: Db , use crate :: feed :: { self , Item } , use crate :: matcher , use crate :: notify , use crate :: organize , use anyhow :: { bail , Context , Result } , use seedr_dl :: { load_auth , SeedrClient } , use std :: path :: PathBuf , use std :: sync :: Arc , use std :: time :: Duration , use tokio :: sync :: mpsc :: UnboundedSender 
 - **Types & Enums**:

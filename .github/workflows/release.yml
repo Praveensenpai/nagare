@@ -81,6 +81,7 @@ jobs:
             ### 🌟 Key Highlights
             - 🖥️ **Interactive Terminal Dashboard**: Real-time TUI for tracking shows, browsing live SubsPlease releases, and monitoring Seedr storage.
             - ⚡ **Zero-Cloud-Bloat Caching**: Checks free quota, caches, downloads, and immediately purges cloud storage.
+            - 🧹 **Autonomous Cloud Space Reclamation**: Automatically detects insufficient Seedr space, purges completed cloud folders, and retries caching seamlessly.
             - 📺 **Jellyfin Auto-Organization**: Renames and files media cleanly (`Show/Season 01/Show - S01E05 - 1080p.mkv`).
             - 📱 **Telegram Event Alerts**: Integrated with `tayori` for instant mobile notifications.
             - 🔄 **Conditional HTTP Fetching**: Native ETag / Last-Modified support.
